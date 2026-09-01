@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+
+# Desenvolvimento — inclui todas as gems, debug tools, etc.
+ARG RUBY_VERSION=4.0.6
+FROM docker.io/library/ruby:$RUBY_VERSION-slim
+
+WORKDIR /rails
+
+# Pacotes base
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y \
+      curl \
+      libjemalloc2 \
+      postgresql-client \
+      build-essential \
+      git \
+      libpq-dev \
+      libyaml-dev \
+      pkg-config && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Dev: sem BUNDLE_WITHOUT, sem BUNDLE_DEPLOYMENT
+ENV RAILS_ENV="development" \
+    BUNDLE_PATH="/usr/local/bundle" \
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+
+# Instala gems (todas, incluindo development/test)
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+# Copia o código da aplicação
+COPY . .
+
+EXPOSE 3000
+CMD ["bin/dev"]

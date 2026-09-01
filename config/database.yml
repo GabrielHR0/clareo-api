@@ -1,0 +1,26 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+development:
+  <<: *default
+  database: <%= ENV.fetch("DATABASE_NAME", "clareo_development") %>
+  username: <%= ENV.fetch("DATABASE_USERNAME", "teste") %>
+  password: <%= ENV["DATABASE_PASSWORD"] %>
+  host: <%= ENV.fetch("DATABASE_HOST", "localhost") %>
+
+test:
+  <<: *default
+  database: <%= ENV.fetch("DATABASE_NAME_TEST", "clareo_test") %>
+  username: <%= ENV.fetch("DATABASE_USERNAME", "teste") %>
+  password: <%= ENV["DATABASE_PASSWORD"] %>
+  host: <%= ENV.fetch("DATABASE_HOST", "localhost") %>
+
+production:
+  primary: &primary_production
+    <<: *default
+    database: <%= ENV.fetch("DATABASE_NAME_PROD", "clareo_production") %>
+    username: <%= ENV.fetch("DATABASE_USERNAME_PROD", "clareo") %>
+    password: <%= ENV["DATABASE_PASSWORD_PROD"] %>
+    host: <%= ENV.fetch("DATABASE_HOST_PROD", "localhost") %>

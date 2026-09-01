@@ -1,0 +1,8 @@
+---
+:concurrency: 10
+:timeout: 25
+:queues:
+  - [critical, 6]       # Webhooks NOWPayments, confirmações
+  - [default, 4]        # Jobs normais
+  - [low, 2]            # Relatórios, limpeza
+  - [yield_monitor, 3]  # Monitoramento de yield JustLend
