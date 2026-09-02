@@ -144,7 +144,7 @@ sequenceDiagram
         A->>T: Envia USDT da carteira JustLend para Binance
         T-->>A: txHash
 
-        A->>Vende USDT para BRL
+        A->>X: Vende USDT para BRL
         X-->>A: BRL na conta Binance
 
         A->>P: Cria withdrawal (USDT → PIX)
