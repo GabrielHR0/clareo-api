@@ -3,7 +3,6 @@
 ## Docker Compose
 
 ```yaml
-# docker-compose.yml
 version: '3.8'
 
 services:
@@ -122,8 +121,7 @@ BINANCE_API_SECRET=
 # TRON
 TRON_FULL_HOST=https://api.trongrid.io
 TRON_API_KEY=
-TRON_MASTER_WALLET_ADDRESS=
-TRON_MASTER_PRIVATE_KEY=
+TRON_SIDECAR_URL=http://tron_sidecar:3001
 
 # NOWPayments
 NOWPAYMENTS_API_KEY=
@@ -146,55 +144,21 @@ cd clareo
 
 # 2. Configurar variáveis de ambiente
 cp .env.example .env
-# Editar .env com suas credenciais
 
-# 3. Gerar master key
-rails credentials:edit
-
-# 4. Build e iniciar
+# 3. Build e iniciar
 docker-compose up -d
 
-# 5. Rodar migrações
+# 4. Rodar migrações
 docker-compose exec api rails db:create db:migrate
 
-# 6. Verificar status
+# 5. Verificar status
 docker-compose ps
 docker-compose logs -f api
 ```
 
-## Deploy em Produção
-
-### Opção 1: VPS (DigitalOcean, Linode, Vultr)
-
-```bash
-# No servidor
-sudo apt update && sudo apt upgrade -y
-sudo apt install docker.io docker-compose -y
-
-# Clonar e configurar
-git clone https://github.com/seu-usuario/clareo.git
-cd clareo
-cp .env.example .env
-# Editar .env
-
-# Iniciar
-docker-compose up -d
-
-# Configurar nginx reverse proxy
-sudo apt install nginx -y
-```
-
-### Opção 2: AWS/GCP/Azure
-
-- Usar ECS/EKS ou Cloud Run
-- RDS para PostgreSQL
-- ElastiCache para Redis
-- S3 para backups
-
 ## Nginx Reverse Proxy
 
 ```nginx
-# /etc/nginx/sites-available/clareo
 server {
     listen 80;
     server_name api.clareo.com.br;
@@ -215,13 +179,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-
-    location /cable {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
 }
 ```
 
@@ -232,56 +189,29 @@ sudo apt install certbot python3-certbot-nginx -y
 sudo certbot --nginx -d api.clareo.com.br
 ```
 
-## Monitoramento
-
-### Health Check
+## Health Check
 
 ```ruby
 # config/routes.rb
 get '/health', to: proc { [200, {}, ['OK']] }
 ```
 
-### Prometheus + Grafana
-
-```ruby
-# Gemfile
-gem 'prometheus-client'
-```
-
 ## Backup
 
 ```bash
-# Backup automático do PostgreSQL
 #!/bin/bash
 # backup.sh
 
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="/backups"
 
-# Backup do banco
 docker-compose exec -T db pg_dump -U clareo clareo_production | gzip > $BACKUP_DIR/db_$DATE.sql.gz
 
-# Backup de uploads
-tar -czf $BACKUP_DIR/uploads_$DATE.tar.gz public/uploads
-
-# Manter apenas últimos 30 dias
 find $BACKUP_DIR -name "*.gz" -mtime +30 -delete
 ```
 
 ### Cron Job
 
 ```bash
-# Adicionar ao crontab
 0 2 * * * /path/to/backup.sh
-```
-
-## Logs
-
-```bash
-# Ver logs em tempo real
-docker-compose logs -f api
-docker-compose logs -f sidekiq
-
-# Logs específicos
-docker-compose logs --tail=100 api
 ```

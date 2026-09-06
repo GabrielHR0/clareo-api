@@ -4,8 +4,8 @@ source "https://rubygems.org"
 gem "rails", "~> 8.1.3"
 # Use postgresql as the database for Active Record
 gem "pg", "~> 1.1"
-# Use the Puma web server [https://github.com/puma/puma]
-gem "puma", ">= 5.0"
+# Use the Kino web server (Rust + Ractors) [https://github.com/yaroslav/kino]
+# gem "puma" # removido - usando Kino
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"

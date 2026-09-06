@@ -1,13 +1,15 @@
 # Clareo — Integração Binance API
 
-> Referência oficial: https://developers.binance.com/en/docs/catalog
+> Referência oficial: https://developers.binance.com/
 
 ## Visão Geral
 
-A Binance é utilizada para:
+Binance é utilizada para:
 - Consultar cotação USDT/BRL em tempo real
 - Comprar USDT com BRL (quando doador paga)
 - Vender USDT para BRL (quando beneficiário saca)
+
+**Taxa:** 0.1% (0.075% com BNB)
 
 ## Configuração
 
@@ -19,21 +21,11 @@ BINANCE_API_KEY=sua_api_key_aqui
 BINANCE_API_SECRET=seu_api_secret_aqui
 ```
 
-### Gem Ruby
-
-```ruby
-# Gemfile
-gem 'binance-ruby' # Cliente oficial Binance
-```
-
 ## Endpoints Utilizados
 
 ### 1. Cotação USDT/BRL
 
 ```ruby
-# GET /api/v3/ticker/price
-# Referência: https://developers.binance.com/en/docs/spot/market-data-rest-api
-
 def get_usdt_brl_price
   uri = URI('https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL')
   response = Net::HTTP.get(uri)
@@ -42,23 +34,12 @@ def get_usdt_brl_price
 end
 ```
 
-**Resposta:**
-```json
-{
-  "symbol": "USDTBRL",
-  "price": "5.05000000"
-}
-```
-
 ### 2. Criar Ordem de Compra
 
 ```ruby
-# POST /api/v3/order
-# Referência: https://developers.binance.com/en/docs/spot/trading-rest-api
-
 def buy_usdt(amount_brl)
   price = get_usdt_brl_price
-  price_with_spread = price * 1.002 # Spread de 0.2%
+  price_with_spread = price * 1.002
   quantity = (amount_brl / price_with_spread).round(4)
 
   params = {
@@ -73,26 +54,28 @@ def buy_usdt(amount_brl)
 end
 ```
 
-**Resposta:**
-```json
-{
-  "orderId": 123456789,
-  "symbol": "USDTBRL",
-  "status": "FILLED",
-  "type": "MARKET",
-  "side": "BUY",
-  "price": "5.05000000",
-  "executedQty": "19.76000000",
-  "cummulativeQuoteQty": "100.00000000"
-}
-```
-
-### 3. Consultar Saldo
+### 3. Criar Ordem de Venda
 
 ```ruby
-# GET /api/v3/account
-# Referência: https://developers.binance.com/en/docs/spot/account-rest-api
+def sell_usdt(amount_usdt)
+  price = get_usdt_brl_price
+  price_with_spread = price * 0.998
 
+  params = {
+    symbol: 'USDTBRL',
+    side: 'SELL',
+    type: 'MARKET',
+    quantity: amount_usdt
+  }
+
+  response = signed_request('/api/v3/order', params)
+  response
+end
+```
+
+### 4. Consultar Saldo
+
+```ruby
 def get_balance(asset)
   response = signed_request('/api/v3/account')
   balances = response['balances']
@@ -131,20 +114,25 @@ end
 
 - **Requisições:** 1200 por minuto
 - **Ordens:** 10 por segundo / 200,000 por dia
-- **Dados de mercado:** 1200 por minuto
 
-## Taxas
+## Fallback: Mercado Bitcoin
 
-| Tipo | Taxa |
-|------|------|
-| Maker | 0.1% |
-| Taker | 0.1% |
-| Desconto BNB | 25% off (0.075%) |
+Se Binance não funcionar, usar Mercado Bitcoin como fallback:
+
+```ruby
+class ExchangeService
+  def buy_usdt(amount_brl)
+    result = binance_buy(amount_brl)
+    return result if result[:success]
+
+    mercadobitcoin_buy(amount_brl)
+  end
+end
+```
 
 ## Segurança
 
-- **NUNCA** exponha API keys no código
 - Use variáveis de ambiente
 - Restrinja permissões da API key (apenas trade)
-- Habilite whitelist de IPs se possível
+- Habilite whitelist de IPs
 - Monitore uso da API no painel Binance

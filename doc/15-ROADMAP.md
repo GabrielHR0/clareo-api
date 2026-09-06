@@ -1,127 +1,192 @@
 # Clareo — Roadmap de Implementação
 
-## Fases de Desenvolvimento
+## Estratégia
 
-### Fase 1: Setup (1 dia)
+Construir em etapas, validar cada fluxo antes de avançar.
+Máxima economia por transação.
 
-- [x] Instalar Ruby 4.0.6
-- [x] Criar projeto Rails API (`rails new clareo --api --database=postgresql`)
-- [x] Adicionar gem `kino` ao Gemfile
-- [x] Criar `config/kino.rb` (workers, threads, mode :threaded)
-- [x] Configurar PostgreSQL
-- [x] Configurar Redis
-- [x] Configurar Sidekiq
+```
+ETAPA 1          ETAPA 2           ETAPA 3          ETAPA 4
+Validar Doação → Adicionar Saque → Yield + Multi-chain → Escalar
+(15-20 dias)     (10-15 dias)      (15-20 dias)      (contínuo)
+```
+
+---
+
+## ETAPA 1: Validar Doação (15-20 dias)
+
+### Objetivo
+Doador paga PIX → USDT chega na wallet → Pode confirmar receipt
+
+### Custo por doação: ~2.04%
+
+### Tasks
+
+#### Setup (2 dias)
+- [ ] Configurar Puma (não Kino)
+- [ ] Configurar PostgreSQL
+- [ ] Configurar Redis
+- [ ] Configurar Sidekiq
 - [ ] Setup Docker Compose
-- [ ] Configurar variáveis de ambiente
-- [ ] Configurar RuboCop e linting
 
-### Fase 2: Models e Database (2 dias)
-
+#### Models e Database (2 dias)
 - [ ] Migration: users
 - [ ] Migration: wallets
 - [ ] Migration: donations
-- [ ] Migration: withdrawals
-- [ ] Migration: yield_snapshots
-- [ ] Migration: audit_logs
 - [ ] Configurar associações
 - [ ] Configurar validações
 - [ ] Configurar indexes
 
-### Fase 3: Autenticação (1 dia)
-
-- [ ] Gem JWT
+#### Autenticação (2 dias)
+- [ ] Gem JWT + bcrypt
 - [ ] AuthService.encode/decode
 - [ ] AuthController (login/register)
 - [ ] Middleware de autenticação
 - [ ] Rate limiting
 
-### Fase 4: Binance Integration (2 dias)
-
+#### Binance Integration (2-3 dias)
 - [ ] Configurar API keys
-- [ ] Service: get_usdt_brl_price
-- [ ] Service: buy_usdt
-- [ ] Service: sell_usdt
-- [ ] Service: get_balance
+- [ ] BinanceService: get_usdt_brl_price
+- [ ] BinanceService: buy_usdt
+- [ ] BinanceService: get_balance
 - [ ] Testes de integração
 
-### Fase 5: TRON Integration (3 dias)
-
+#### TRON Integration (2-3 dias)
 - [ ] Setup Node.js sidecar
-- [ ] Service: create_wallet
-- [ ] Service: get_balance
-- [ ] Service: transfer_usdt
-- [ ] Service: get_transaction
-- [ ] Configurar staking TRX
+- [ ] TronService: create_wallet
+- [ ] TronService: get_balance
+- [ ] TronService: transfer_usdt
 - [ ] Testes de integração
 
-### Fase 6: JustLend Integration (2 dias)
-
-- [ ] Service: get_apy
-- [ ] Service: supply (depositar)
-- [ ] Service: redeem (sacar)
-- [ ] Service: get_balance
-- [ ] YieldMonitorJob (Sidekiq)
-- [ ] Testes de integração
-
-### Fase 7: NOWPayments Integration (2 dias)
-
+#### NOWPayments Integration (2 dias)
 - [ ] Configurar API keys
-- [ ] Service: create_payment
-- [ ] Service: create_withdrawal
-- [ ] Service: get_payment_status
+- [ ] NowPaymentsService: create_payment
 - [ ] WebhooksController (IPN)
 - [ ] Verificação de assinatura
 - [ ] Testes de integração
 
-### Fase 8: API REST (2 dias)
-
-- [ ] DonationsController
-- [ ] WalletsController
-- [ ] WithdrawalsController
-- [ ] YieldController
+#### API REST (2-3 dias)
+- [ ] DonationsController (create, show, index)
+- [ [ ] WalletsController (create, index)
+- [ ] AuthController (login, register, me)
 - [ ] Serializers/Validators
-- [ ] Documentação Swagger/OpenAPI
 
-### Fase 9: Sidekiq Jobs (1 dia)
-
+#### Jobs (1 dia)
 - [ ] DonationConfirmJob
-- [ ] WithdrawalProcessJob
-- [ ] YieldMonitorJob
 - [ ] WebhookProcessJob
-- [ ] Configurar filas e prioridades
+- [ ] Configurar filas
 
-### Fase 10: Deploy (1 dia)
-
-- [ ] Dockerfile
-- [ ] docker-compose.yml
-- [ ] Nginx config
-- [ ] SSL (Let's Encrypt)
-- [ ] Variáveis de ambiente
-- [ ] Health check
-- [ ] Backup automático
-
-### Fase 11: Testes (2 dias)
-
+#### Testes (2-3 dias)
 - [ ] Configurar RSpec
 - [ ] Testes de model
 - [ ] Testes de service
 - [ ] Testes de controller
 - [ ] Testes de integração
-- [ ] Testes de webhook
 
-### Fase 12: Documentação (1 dia)
+#### Deploy (1 dia)
+- [ ] Dockerfile
+- [ ] docker-compose.yml
+- [ ] Variáveis de ambiente
+- [ ] Health check
 
-- [x] Visão geral
-- [x] Arquitetura
-- [x] Modelos de dados
-- [x] Fluxos
-- [x] Integrações
-- [x] Segurança
-- [x] Custos e receitas
-- [x] Deploy
-- [x] API endpoints
-- [x] Referências
-- [ ] README.md do projeto
+---
+
+## ETAPA 2: Adicionar Saque (10-15 dias)
+
+### Objetivo
+Beneficiário solicita saque → USDT vira BRL → PIX na conta
+
+### Custo por saque: ~0.60%
+
+### Tasks
+
+#### Models (1 dia)
+- [ ] Migration: withdrawals
+- [ ] Configurar associações
+- [ ] Configurar validações
+
+#### Services (2-3 dias)
+- [ ] WithdrawalService: process
+- [ ] BinanceService: sell_usdt
+- [ ] NowPaymentsService: create_withdrawal
+
+#### API (2 dias)
+- [ ] WithdrawalsController (create, show, index)
+- [ ] Serializers/Validators
+
+#### Jobs (1-2 dias)
+- [ ] WithdrawalProcessJob
+- [ ] Configurar filas
+
+#### Testes (2-3 dias)
+- [ ] Testes de model
+- [ ] Testes de service
+- [ ] Testes de integração
+
+#### Deploy (1 dia)
+- [ ] Atualizar Docker Compose
+- [ ] Variáveis de ambiente
+
+---
+
+## ETAPA 3: Yield + Multi-chain (15-20 dias)
+
+### Objetivo
+Dinheiro parado gera rendimento + suporte a Solana
+
+### Custo por doação: ~1.00% (com yield cobrindo parte)
+
+### Tasks
+
+#### Aave Integration (3-4 dias)
+- [ ] Setup Ethereum/Polygon sidecar
+- [ ] AaveService: supply
+- [ ] AaveService: withdraw
+- [ ] AaveService: get_apy
+- [ ] AaveService: get_balance
+- [ ] Testes de integração
+
+#### Solana Integration (3-4 dias)
+- [ ] Setup Solana sidecar
+- [ ] SolanaService: create_wallet
+- [ ] SolanaService: transfer_usdt
+- [ ] SolanaService: get_balance
+- [ ] Testes de integração
+
+#### Yield Monitoring (2-3 dias)
+- [ ] Migration: yield_snapshots
+- [ ] YieldService: calculate_earned
+- [ ] YieldMonitorJob (Sidekiq)
+- [ ] Alertas de APY baixo
+
+#### Multi-chain Support (2-3 dias)
+- [ ] Atualizar WalletsController
+- [ ] Suporte a rede Solana
+- [ ] Seleção de rede no frontend
+
+#### Testes (2-3 dias)
+- [ ] Testes de integração Aave
+- [ ] Testes de integração Solana
+- [ ] Testes de yield
+
+#### Deploy (1-2 dias)
+- [ ] Atualizar Docker Compose
+- [ ] Variáveis de ambiente
+
+---
+
+## ETAPA 4: Escalar e Otimizar (Contínuo)
+
+### Tasks
+- [ ] Dashboard admin
+- [ ] Notificações push
+- [ ] Multi-idioma (PT/EN/ES)
+- [ ] App mobile (React Native)
+- [ ] Relatórios financeiros
+- [ ] API pública para integrações
+- [ ] Monitoring (Prometheus + Grafana)
+- [ ] Alertas avançados
+- [ ] Backup automático
 
 ---
 
@@ -129,33 +194,25 @@
 
 | Fase | Dias | Dependências |
 |------|------|--------------|
-| 1. Setup | 1 | - |
-| 2. Models | 2 | Fase 1 |
-| 3. Auth | 1 | Fase 2 |
-| 4. Binance | 2 | Fase 3 |
-| 5. TRON | 3 | Fase 3 |
-| 6. JustLend | 2 | Fase 5 |
-| 7. NOWPayments | 2 | Fase 3 |
-| 8. API | 2 | Fases 4-7 |
-| 9. Jobs | 1 | Fase 8 |
-| 10. Deploy | 1 | Fase 9 |
-| 11. Testes | 2 | Fase 10 |
-| 12. Docs | 1 | Fase 11 |
-| **Total** | **20 dias** | - |
+| **Etapa 1** | 15-20 | - |
+| **Etapa 2** | 10-15 | Etapa 1 |
+| **Etapa 3** | 15-20 | Etapa 1 |
+| **Etapa 4** | Contínuo | Etapas 1-3 |
+| **Total MVP** | **30-40** | - |
 
 ## Marcos Importantes
 
-| Marco | Dia | Entregável |
-|-------|-----|------------|
-| MVP Funcional | 10 | API rodando com 3 integrações |
-| Beta Fechado | 15 | Sistema completo com testes |
-| Lançamento | 20 | Produção com documentação |
+| Marco | Entregável |
+|-------|------------|
+| **MVP Funcional** | Doação funcionando (PIX → USDT → Wallet) |
+| **Beta Fechado** | Doação + Saque funcionando |
+| **Beta Aberto** | Yield + Multi-chain |
+| **Lançamento** | Sistema completo com testes |
 
 ## Prioridades Pós-Lançamento
 
 1. Dashboard admin
-2. Notificações push
-3. App mobile (React Native)
-4. Multi-idioma (PT/EN/ES)
-5. Relatórios financeiros
-6. API pública para integrações
+2. Multi-chain (Solana + Base)
+3. Yield diversificado (Aave + Morpho)
+4. Notificações push
+5. App mobile (React Native)

@@ -19,9 +19,10 @@
 │                     KINO SERVER                                 │
 │              (Rust Tokio/Hyper front-end)                       │
 │              Ruby 4.0.6 + Ractor workers                        │
+│              Mode: :threaded (Rails ainda não suporta Ractors)  │
 ├─────────────────────────────────────────────────────────────────┤
 │                     RAILS API                                   │
-│                  (Ruby 4.0.6 + Rails 8.1.3)                     │
+│                  (Ruby 4.0.6 + Rails 8.1)                       │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
 │  │ Auth     │ │Donations │ │ Wallets  │ │Yield     │           │
 │  │Controller│ │Controller│ │Controller│ │Controller│           │
@@ -31,7 +32,7 @@
 │  ┌─────────────────────────────────────────────────────┐        │
 │  │              SERVICE LAYER                          │        │
 │  │  • BinanceService    • TronService                 │        │
-│  │  • JustLendService   • NowPaymentsService          │        │
+│  │  • AaveService       • NowPaymentsService          │        │
 │  │  • YieldService      • WithdrawalService           │        │
 │  └─────────────────────────────────────────────────────┘        │
 └───────────┬─────────────────────────────────────┬───────────────┘
@@ -58,49 +59,65 @@
             ▼                                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    EXTERNOS                                      │
-│  • Binance API    • TRON Network    • JustLend                  │
-│  • NOWPayments    • PIX             • JustLend                  │
+│  • Binance API    • TRON Network    • Aave V3                  │
+│  • NOWPayments    • Solana          • Mercado Bitcoin           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Decisões Técnicas
 
 ### Por que Kino e não Puma?
-- **Performance:** 1.5-1.7× mais throughput que Puma em I/O
-- **HTTP/2 nativo:** +79% sobre HTTP/1.1, sem necessidade de nginx
-- **Memória:** ~4× menos que Puma cluster em apps Rails
-- **Ractor-ready:** Parallelismo real quando Rails suportar Ractors
-- **Rust front-end:** Tokio/Hyper para I/O de alta performance
-- **Config DSL familiar:** Mesmo estilo do Puma, fácil migração
-- **Produção pronta:** Graceful drain, crash supervision, timeouts
 
-### Por que TRON e não Ethereum?
-- Gas fee ~$0.01 vs $5-50 no Ethereum
-- Transações confirmadas em 3 segundos
-- Suporte nativo a TRC-20 (USDT)
-- Staking de TRX para transações gratuitas
+| Métrica | Kino | Puma |
+|---------|------|------|
+| Throughput | 229k req/s | 118k req/s |
+| Memória (tiny app) | 148 MB | 1,068 MB |
+| HTTP/2 | Nativo | Precisa nginx |
+| Ractor support | Sim (quando Rails suportar) | Não |
+| Rust I/O | Tokio/Hyper | Ruby puro |
 
-### Por que JustLend e não Aave?
-- Aave V3 ainda não está deployado no TRON
-- JustLend é o maior protocolo de lending na TRON
-- ~1.35% APY atual (conservador)
-- Contratos auditados pela TronLink
+**Benchmarks reais (AWS c7a.2xlarge, 8-core):**
 
-### Por que Binance e não NOWPayments para tudo?
-- Binance tem taxas menores para trading (0.1%)
-- Melhor liquidez para USDT/BRL
-- NOWPayments usado apenas para on-ramp via PIX
+| Endpoint | Kino :ractor | Kino :threaded | Puma cluster |
+|----------|--------------|----------------|--------------|
+| /plaintext | 229,534 | 216,994 | 118,176 |
+| /10k | 178,083 | 160,400 | 106,768 |
+| /cpu (fib) | 77,999 | 13,429 | 58,006 |
+| /io (5ms) | 1,552 | 4,709 | 4,693 |
 
-### Por que Sidecar Node.js?
-- TronWeb é uma biblioteca JavaScript
-- Tratar blockchain via API REST é mais complexo
-- Sidecar mantém conexão persistente com TRON
+**Rails:** Kino roda em `:threaded` mode (Rails não suporta Ractors ainda), mas o Rust front-end já traz ganhos significativos.
+
+### Por que TRON + Solana?
+
+- **TRON:** 52% do volume de stablecoins, deep liquidity, universal support
+- **Solana:** $0.0004 por transferência (2.500x mais barato que TRON)
+- **Estratégia:** TRON para valores > $50, Solana para micro-transações
+
+### Por que Binance + Mercado Bitcoin?
+
+- **Binance:** 0.1% fee, melhor liquidez, API robusta
+- **Mercado Bitcoin:** SPSAV autorizado, compliance garantido, fallback
+- **Estratégia:** Binance como primário, MB como backup/compliance
+
+### Por que Aave e não JustLend?
+
+- **APY:** Aave 3-5% vs JustLend 1.35%
+- **Risco:** Aave é o maior protocolo DeFi ($38.6B TVL)
+- **Multi-chain:** Aave funciona em 15+ blockchains
+- **Liquidez:** Saque a qualquer momento sem penalty
+
+### Por que NOWPayments para PIX?
+
+- **Widget pronto:** Não precisa desenvolver checkout
+- **Non-custodial:** Fundos vão direto para nossa wallet
+- **Taxa:** 0.5% (competitivo)
+- **Suporte:** 350+ coins, auto-conversão
 
 ## Fluxo de Dados
 
-1. **Doação:** Cliente → Rails API → NOWPayments → Binance → USDT → TRON → JustLend
-2. **Saque:** Beneficiário → Rails API → Binance → Vende USDT → PIX → Beneficiário
-3. **Yield:** Sidekiq job (24h) → JustLend API → Calcula rendimento → Atualiza saldo
+1. **Doação:** Doador → NOWPayments → Binance → USDT → TRON/Solana → Aave
+2. **Saque:** Beneficiário → Aave → Binance → PIX → Beneficiário
+3. **Yield:** Sidekiq job (24h) → Aave API → Calcula rendimento → Atualiza saldo
 
 ## Cache e Performance
 

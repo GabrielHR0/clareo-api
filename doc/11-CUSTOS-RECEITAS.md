@@ -8,31 +8,52 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 
 | Fonte | Descrição | Margem |
 |-------|-----------|--------|
-| **Taxa de serviço** | 2% cobrado por doação | 45% |
-| **Yield gerado** | Rendimento USDT (JustLend) | 100% |
+| **Taxa de serviço** | 2% cobrado por doação | Alta |
+| **Yield gerado** | Rendimento USDT (Aave V3) | 100% |
 | **Planos SaaS** | Básico/Pro/Enterprise | 80% |
 
 ## Custos Variáveis por Doação (R$100)
 
+### Etapa 1 (Validar)
+
 | Etapa | Custo | Observação |
 |-------|-------|------------|
-| PIX (comerciante) | R$0,50 | Taxa média mercado |
-| Binance spread | R$0,20 | 0.2% da transação |
-| TRON gas (staking) | R$0,05 | Com stake de TRX |
-| JustLend deposit | R$0,05 | Gas fee |
-| JustLend withdraw | R$0,05 | Gas fee |
-| **Total variável** | **R$1,10** | **1.1% do valor** |
+| NOWPayments (PIX) | R$0.50 | 0.5% da transação |
+| Binance spread | R$0.10 | 0.1% da transação |
+| TRON gas | R$1.44 | ~$0.14 em TRX |
+| **Total variável** | **R$2.04** | **2.04% do valor** |
+
+### Etapa 3 (Otimizado)
+
+| Etapa | Custo | Observação |
+|-------|-------|------------|
+| NOWPayments (PIX) | R$0.50 | 0.5% da transação |
+| Binance spread | R$0.10 | 0.1% da transação |
+| TRON gas (energy rental) | R$0.40 | Com energy rental |
+| **Total variável** | **R$1.00** | **1.00% do valor** |
 
 ## Margem por Doação
 
+### Etapa 1
+
 | Item | Valor |
 |------|-------|
-| Receita (2% de R$100) | R$2,00 |
-| Custo variável | R$1,10 |
-| **Lucro por doação** | **R$0,90** |
-| **Margem** | **45%** |
+| Receita (2% de R$100) | R$2.00 |
+| Custo variável | R$2.04 |
+| **Lucro por doação** | **-R$0.04** |
+| **Margem** | **-2%** |
 
-## Yield Estimado (4% APY)
+### Etapa 3 (com yield)
+
+| Item | Valor |
+|------|-------|
+| Receita (2% de R$100) | R$2.00 |
+| Custo variável | R$1.00 |
+| Yield (5% APY / 365) | R$0.01 |
+| **Lucro por doação** | **R$1.01** |
+| **Margem** | **50.5%** |
+
+## Yield Estimado (4% APY - Aave V3)
 
 | Volume Mensal | Yield Mensal | Yield Anual |
 |---------------|--------------|-------------|
@@ -41,27 +62,6 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | R$100.000 | R$1.100 | R$13.200 |
 | R$500.000 | R$5.500 | R$66.000 |
 | R$1.000.000 | R$11.000 | R$132.000 |
-
-## Projeção de Lucro (12 meses)
-
-### Cenário Conservador (100 doações/mês, R$100 média)
-
-| Mês | Doações | Receita Fee | Yield | Lucro Total |
-|-----|---------|-------------|-------|-------------|
-| 1 | 100 | R$200 | R$11 | R$101 |
-| 2 | 150 | R$300 | R$22 | R$202 |
-| 3 | 200 | R$400 | R$33 | R$303 |
-| 6 | 350 | R$700 | R$66 | R$556 |
-| 12 | 600 | R$1.200 | R$132 | R$992 |
-
-### Cenário Otimista (500 doações/mês, R$200 média)
-
-| Mês | Doações | Receita Fee | Yield | Lucro Total |
-|-----|---------|-------------|-------|-------------|
-| 1 | 500 | R$2.000 | R$110 | R$1.010 |
-| 3 | 750 | R$3.000 | R$220 | R$1.870 |
-| 6 | 1.000 | R$4.000 | R$440 | R$2.920 |
-| 12 | 1.500 | R$6.000 | R$880 | R$4.620 |
 
 ## Planos SaaS
 
@@ -78,7 +78,6 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | R$500 | ~278 doações |
 | R$1.000 | ~556 doações |
 | R$2.000 | ~1.112 doações |
-| R$5.000 | ~2.778 doações |
 
 ## Custos Fixos Mensais
 
@@ -90,9 +89,26 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | Domínio + SSL | R$10 |
 | **Total** | **R$130-260** |
 
-## Considerações Fiscais
+## Comparativo: Modelo Atual vs Otimizado
 
-- **IR sobre yield:** 15-22.5% (maior faixa)
-- **Lucro da plataforma:** Tributado conforme regime escolhido
-- **USDT:** Considerado moeda virtual pela Receita Federal
-- **Necessário:** Contador especializado em criptoativos
+### Doação de R$100
+
+| Modelo | Custo Total | % |
+|--------|-------------|---|
+| Modelo Atual (docs) | R$3.14 | 3.14% |
+| Etapa 1 | R$2.04 | 2.04% |
+| Etapa 3 | R$1.00 | 1.00% |
+
+### Saque de R$100
+
+| Modelo | Custo Total | % |
+|--------|-------------|---|
+| Modelo Atual (docs) | R$1.70 | 1.70% |
+| Etapa 2+ | R$0.60 | 0.60% |
+
+## Economia Anual (R$100k/mês volume)
+
+| Modelo | Custo Anual | Economia |
+|--------|-------------|----------|
+| Modelo Atual | R$37.680 | - |
+| Etapa 3 | R$12.000 | **R$25.680 (68%)** |

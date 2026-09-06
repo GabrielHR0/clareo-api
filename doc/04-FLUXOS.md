@@ -1,52 +1,55 @@
 # Clareo — Fluxos do Sistema
 
-## Fluxo 1: Doação (Deposit Flow)
+## Fluxo 1: Doação (Etapa 1 - Validar)
 
 ```
-Doador                    Sistema                     Blockchain
+Doador                    Sistema                     Externo
   │                         │                           │
-  │  1. Seleciona método    │                           │
-  │  (PIX/Cartão)           │                           │
+  │  1. Criar conta         │                           │
+  │  (email, senha)         │                           │
   │ ──────────────────────> │                           │
   │                         │                           │
-  │  2. Cria pagamento      │                           │
-  │     NOWPayments         │                           │
-  │ ──────────────────────> │                           │
+  │  2. Criar carteira      │                           │
+  │     TRON                │                           │
+  │ ──────────────────────> │ ───────────────────────> │ TronWeb Sidecar
   │                         │                           │
-  │  3. Redireciona para    │                           │
-  │     pagamento           │                           │
+  │  3. Criar doação        │                           │
+  │     (R$ valor)          │                           │
+  │ ──────────────────────> │                           │
+  │                         │  4. NOWPayments           │
+  │                         │     cria pagamento        │
+  │                         │ ───────────────────────> │
+  │                         │                           │
+  │  5. Retorna URL         │                           │
+  │  de pagamento           │                           │
   │ <────────────────────── │                           │
   │                         │                           │
-  │  4. Pagamento aprovado  │                           │
+  │  6. Paga via PIX        │                           │
   │ ──────────────────────> │                           │
   │                         │                           │
-  │                         │  5. Webhook NOWPayments    │
-  │                         │ ────────────────────────> │
+  │                         │  7. Webhook NOWPayments   │
+  │                         │ ───────────────────────> │
   │                         │                           │
-  │                         │  6. Compra USDT           │
-  │                         │     (Binance API)         │
+  │                         │  8. Binance compra USDT   │
+  │                         │     (0.1%)                │
+  │                         │ ───────────────────────> │
   │                         │                           │
-  │                         │  7. Envia USDT TRC-20     │
-  │                         │     (TronWeb)             │
-  │                         │ ────────────────────────> │
+  │                         │  9. Envia USDT TRC-20     │
+  │                         │     (~$1.44)              │
+  │                         │ ───────────────────────> │ TRON Network
   │                         │                           │
-  │                         │  8. Deposita em JustLend  │
-  │                         │     (Yield)               │
-  │                         │ ────────────────────────> │
-  │                         │                           │
-  │  9. Confirmação via     │                           │
-  │     email/webhook       │                           │
+  │  10. Confirmação        │                           │
   │ <────────────────────── │                           │
 ```
 
 **Status da doação:**
-- `pending` → Pagamento criado
-- `confirmed` → Pagamento recebido + USDT convertido
+- `pending` → Pagamento criado no NOWPayments
+- `confirmed` → Pagamento recebido + USDT convertido + enviado
 - `failed` → Erro na conversão ou envio
 
 ---
 
-## Fluxo 2: Saque (Withdrawal Flow)
+## Fluxo 2: Saque (Etapa 2 - Adicionar)
 
 ```
 Beneficiário               Sistema                     Externo
@@ -59,65 +62,69 @@ Beneficiário               Sistema                     Externo
   │     necessário          │                           │
   │                         │                           │
   │  3. Verifica saldo      │                           │
-  │     JustLend            │                           │
-  │                         │ ────────────────────────> │
+  │     Aave/wallet         │                           │
+  │                         │ ───────────────────────> │ Aave V3
   │                         │                           │
-  │  4. Sacar USDT          │                           │
-  │     do JustLend         │                           │
-  │                         │ ────────────────────────> │
+  │  4. Redeem USDT         │                           │
+  │     do Aave             │                           │
+  │                         │ ───────────────────────> │
   │                         │                           │
   │  5. Vender USDT         │                           │
   │     (Binance API)       │                           │
+  │                         │ ───────────────────────> │ Binance
   │                         │                           │
   │  6. Envia PIX           │                           │
   │     para beneficiário   │                           │
-  │                         │ ────────────────────────> │
+  │                         │ ───────────────────────> │ NOWPayments
   │                         │                           │
-  │  7. Confirmação via     │                           │
-  │     email/webhook       │                           │
+  │  7. Confirmação         │                           │
   │ <────────────────────── │                           │
 ```
 
 **Status do saque:**
 - `pending` → Solicitação criada
-- `processing` → Em processamento
+- `processing` → Em processamento (redeeming + vendendo)
 - `completed` → PIX enviado
 - `failed` → Erro no processamento
 
 ---
 
-## Fluxo 3: Yield (Yield Flow)
+## Fluxo 3: Yield (Etapa 3 - Adicionar)
 
 ```
-Sidekiq Job               Sistema                     JustLend
+Sidekiq Job               Sistema                     Aave V3
   │                         │                           │
   │  1. Executa a cada 24h  │                           │
   │ ──────────────────────> │                           │
   │                         │                           │
   │  2. Consulta APY        │                           │
   │     atual               │                           │
-  │                         │ ────────────────────────> │
+  │                         │ ───────────────────────> │
   │                         │                           │
   │  3. Retorna APY         │                           │
   │                         │ <──────────────────────── │
   │                         │                           │
-  │  4. Calcula ganho       │                           │
+  │  4. Consulta saldo      │                           │
+  │     de cada carteira    │                           │
+  │                         │ ───────────────────────> │
+  │                         │                           │
+  │  5. Retorna saldo       │                           │
+  │                         │ <──────────────────────── │
+  │                         │                           │
+  │  6. Calcula ganho       │                           │
   │     = saldo × APY/365   │                           │
   │                         │                           │
-  │  5. Salva snapshot      │                           │
+  │  7. Salva snapshot      │                           │
   │                         │                           │
-  │  6. Atualiza saldo      │                           │
+  │  8. Atualiza saldo      │                           │
   │     wallet              │                           │
-  │                         │                           │
-  │  7. Notifica admin      │                           │
-  │     se ganho > threshold│                           │
-  │                         │                           │
 ```
 
 **Snapshot contém:**
 - `balance` → Saldo naquele momento
-- `apy` → APY do JustLend
+- `apy` → APY do Aave
 - `earned` → Ganhos acumulados
+- `protocol` → Protocolo utilizado (aave, morpho)
 
 ---
 
@@ -176,9 +183,7 @@ Cliente                    Rails API                  Redis
   │ ────────────────────────> │                         │
   │                           │                         │
   │  7. Valida JWT            │                         │
-  │     e verifica se não     │                         │
-  │     está na blacklist     │                         │
-  │                           │ ──────────────────────> │
+  │ ────────────────────────> │ ──────────────────────> │
   │                           │                         │
   │  8. Retorna resposta      │                         │
   │ <──────────────────────── │                         │

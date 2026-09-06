@@ -1,4 +1,4 @@
-# Clareo — APIs Externais Detalhadas
+# Clareo — APIs Externas Detalhadas
 
 ## Mapa das Integrações
 
@@ -10,7 +10,6 @@ graph TB
 
     subgraph "NOWPayments"
         N1[On-ramp: BRL → USDT]
-        N2[Off-ramp: USDT → BRL]
         N3[Webhook: payment_status]
     end
 
@@ -27,15 +26,14 @@ graph TB
         T4[GET /transaction/:txHash]
     end
 
-    subgraph "JustLend"
-        J1[GET /justlend/apy]
-        J2[POST /justlend/supply]
-        J3[POST /justlend/redeem]
-        J4[GET /justlend/balance/:address]
+    subgraph "Aave V3"
+        A1[POST /aave/supply]
+        A2[POST /aave/withdraw]
+        A3[GET /aave/balance/:address]
+        A4[GET /aave/apy]
     end
 
     API --> N1
-    API --> N2
     API --> N3
     API --> B1
     API --> B2
@@ -44,10 +42,10 @@ graph TB
     API --> T2
     API --> T3
     API --> T4
-    API --> J1
-    API --> J2
-    API --> J3
-    API --> J4
+    API --> A1
+    API --> A2
+    API --> A3
+    API --> A4
 ```
 
 ---
@@ -55,11 +53,10 @@ graph TB
 ## NOWPayments — Detalhes
 
 ### O que é
-Gateway de pagamento que aceita cripto e fiat via PIX, cartão, boleto.
+Gateway de pagamento que aceita PIX e converte para USDT.
 
 ### Quando usar
-- **Doação:** Doador paga R$ → NOWPayments converte para USDT
-- **Saque:** Beneficiário saca USDT → NOWPayments envia PIX
+- **Doação:** Doador paga R$ via PIX → NOWPayments converte para USDT
 
 ### Endpoints
 
@@ -67,37 +64,17 @@ Gateway de pagamento que aceita cripto e fiat via PIX, cartão, boleto.
 |----------|--------|-----------|
 | `/v1/payment` | POST | Cria pagamento (on-ramp) |
 | `/v1/payment/:id` | GET | Consulta status |
-| `/v1/withdrawal` | POST | Cria saque (off-ramp) |
 
-### Fluxo On-ramp
+### Fluxo
 
 ```
 Doador (PIX) → NOWPayments → USDT TRC-20 → Clareo
-```
-
-### Fluxo Off-ramp
-
-```
-Clareo → USDT TRC-20 → NOWPayments → PIX → Beneficiário
 ```
 
 ### Webhook (IPN)
 
 ```
 NOWPayments → POST /api/v1/webhooks/nowpayments → Clareo
-```
-
-Payload:
-```json
-{
-  "payment_id": 12345,
-  "payment_status": "finished",
-  "order_id": "donation_abc123",
-  "price_amount": 100.00,
-  "price_currency": "brl",
-  "amount": 19.76,
-  "amount_currency": "usdttrc20"
-}
 ```
 
 ---
@@ -127,26 +104,12 @@ X-MBX-APIKEY: sua_api_key
 Signature: HMAC-SHA256(query_string, api_secret)
 ```
 
-### Exemplo de compra
-
-```
-1. GET /api/v3/ticker/price?symbol=USDTBRL → 5.05
-2. Aplica spread: 5.05 × 1.002 = 5.06
-3. Calcula quantidade: R$100 / 5.06 = 19.76 USDT
-4. POST /api/v3/order { symbol: USDTBRL, side: BUY, quantity: 19.76 }
-```
-
 ---
 
 ## TRON Sidecar — Detalhes
 
 ### O que é
 Node.js que roda TronWeb para interagir com a blockchain TRON.
-
-### Por que Sidecar?
-- TronWeb é JavaScript (não existe gem Ruby madura)
-- Conexão persistente com a rede TRON
-- Rails se comunica via HTTP com o sidecar
 
 ### Endpoints
 
@@ -156,10 +119,6 @@ Node.js que roda TronWeb para interagir com a blockchain TRON.
 | `/wallet/:address/balance` | GET | Consulta saldo USDT |
 | `/wallet/transfer` | POST | Envia USDT TRC-20 |
 | `/transaction/:txHash` | GET | Verifica status tx |
-| `/justlend/apy` | GET | Consulta APY JustLend |
-| `/justlend/supply` | POST | Deposita USDT no JustLend |
-| `/justlend/redeem` | POST | Saca USDT do JustLend |
-| `/justlend/balance/:address` | GET | Saldo no JustLend |
 
 ### Endereço do Contrato USDT
 
@@ -169,50 +128,49 @@ TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 
 ---
 
-## JustLend — Detalhes
+## Aave V3 — Detalhes
 
 ### O que é
-Protocolo de lending na TRON — deposita USDT e recebe yield (~1.35% APY).
+Maior protocolo de lending descentralizado — deposita USDT e recebe yield (3-5% APY).
 
 ### Como funciona
 
 ```
-Deposita USDT → Recebe cTokens → cTokens geram yield → Saca USDT
+Deposita USDT → Recebe aUSDT → aUSDT gera yield → Saca USDT
 ```
 
 ### Endpoints
 
 | Endpoint | Método | O que faz |
 |----------|--------|-----------|
-| `/justlend/apy` | GET | Consulta APY atual |
-| `/justlend/supply` | POST | Deposita USDT |
-| `/justlend/redeem` | POST | Saca USDT |
-| `/justlend/balance/:address` | GET | Saldo em cTokens + USDT |
+| `/aave/apy` | GET | Consulta APY atual |
+| `/aave/supply` | POST | Deposita USDT |
+| `/aave/withdraw` | POST | Saca USDT |
+| `/aave/balance/:address` | GET | Saldo em aUSDT + USDT |
 
 ### Contratos
 
-| Contrato | Endereço |
-|----------|----------|
-| Comptroller | `TX7QNd8Vr7VgqgvXkEBK5RBX6jTJFm5vA` |
-| cUSDT | `TBDZs8sHXY8dBX9rYJbE9U8V2Hm4q5J2w` |
-| USDT | `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` |
+| Contrato | Endereço (Ethereum) |
+|----------|---------------------|
+| Aave Pool | `0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2` |
+| USDT | `0xdAC17F958D2ee523a2206206994597C13D831ec7` |
 
 ### Fluxo
 
 ```
-1. Aprovar USDT para JustLend (approve)
-2. Depositar USDT (mint) → recebe cTokens
-3. cTokens crescem a cada bloco (yield)
-4. Saca USDT (redeem) → devolve cTokens + juros
+1. Aprovar USDT para Aave (approve)
+2. Depositar USDT (supply) → recebe aUSDT
+3. aUSDT cresce a cada bloco (yield)
+4. Saca USDT (withdraw) → devolve aUSDT + juros
 ```
 
 ---
 
 ## Resumo de Custos por Transação
 
-| Ação | NOWPayments | Binance | TRON | JustLend |
-|------|-------------|---------|------|----------|
-| Doação R$100 | ~R$1.50 | ~R$0.10 | ~$0.01 | Gas |
-| Saque R$100 | ~R$1.50 | ~R$0.10 | ~$0.01 | Gas |
+| Ação | NOWPayments | Binance | TRON | Aave |
+|------|-------------|---------|------|------|
+| Doação R$100 | ~R$0.50 | ~R$0.10 | ~$1.44 | Gas |
+| Saque R$100 | ~R$0.50 | ~R$0.10 | ~$1.44 | Gas |
 | Consulta cotação | - | Grátis | - | - |
 | Consulta saldo | - | Grátis | Grátis | Grátis |

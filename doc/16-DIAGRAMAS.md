@@ -8,7 +8,7 @@ graph TB
         A[Browser/Mobile]
     end
 
-    subgraph "Clareo API (Rails 8.1 + Kino)"
+    subgraph "Clareo API (Rails 8.1 + Puma)"
         B[API Controller]
         C[Service Layer]
     end
@@ -26,10 +26,11 @@ graph TB
         G[NOWPayments]
         H[Binance]
         I[TRON Network]
-        J[JustLend]
+        J[Aave V3]
+        K[Solana]
     end
 
-    A -->|HTTP/2| B
+    A -->|HTTPS| B
     B --> C
     C --> D
     C --> E
@@ -39,6 +40,7 @@ graph TB
     C --> H
     C --> I
     C --> J
+    C --> K
 ```
 
 ---
@@ -47,27 +49,30 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph "NOWPayments (On/Off-ramp)"
+    subgraph "NOWPayments (PIX Widget)"
         N1[BRL via PIX] -->|On-ramp| N2[USDT TRC-20]
-        N3[USDT TRC-20] -->|Off-ramp| N4[PIX para beneficiário]
     end
 
     subgraph "Binance (Exchange)"
-        B1[BRL] -->|Compra| B2[USDT]
-        B2 -->|Vende| B3[BRL]
+        B1[BRL] -->|Compra 0.1%| B2[USDT]
+        B2 -->|Vende 0.1%| B3[BRL]
         B4[Cotação USDT/BRL] -.->|Consulta| B5[GET /api/v3/ticker/price]
     end
 
     subgraph "TRON (Blockchain)"
-        T1[Carteira] -->|Envia| T2[USDT TRC-20]
+        T1[Carteira] -->|Envia ~$1.44| T2[USDT TRC-20]
         T2 -->|Recebe| T3[Carteira]
-        T4[Staking TRX] -.->|Gas grátis| T1
     end
 
-    subgraph "JustLend (Yield)"
-        J1[Deposita USDT] -->|Supply| J2[cTokens]
-        J2 -->|Redeem| J3[Saca USDT]
-        J4[APY ~1.35%] -.->|Rendimento| J2
+    subgraph "Aave V3 (Yield)"
+        J1[Deposita USDT] -->|Supply| J2[aUSDT]
+        J2 -->|Withdraw| J3[Saca USDT]
+        J4[APY 3-5%] -.->|Rendimento| J2
+    end
+
+    subgraph "Solana (Low-fee)"
+        S1[Carteira] -->|Envia $0.0004| S2[USDT SPL]
+        S2 -->|Recebe| S3[Carteira]
     end
 ```
 
@@ -81,31 +86,34 @@ sequenceDiagram
     participant A as Clareo API
     participant N as NOWPayments
     participant B as Binance
-    participant T as TRON Sidecar
-    participant J as JustLend
+    participant T as TRON Network
+    participant Av as Aave V3
 
     D->>A: POST /donations (valor R$)
     A->>A: Valida dados
-    A->>N: Cria pagamento (BRL → USDT)
+    A->>N: Cria pagamento (0.5%)
     N-->>A: payment_url + payment_id
     A-->>D: Retorna URL de pagamento
 
-    D->>N: Paga via PIX/Cartão
+    D->>N: Paga via PIX
     N->>N: Processa pagamento
 
     N->>A: Webhook: payment_status=finished
     A->>A: Verifica assinatura IPN
 
-    A->>B: Compra USDT (POST /api/v3/order)
+    A->>B: Compra USDT (0.1%)
     B-->>A: orderId + USDT comprado
 
-    A->>T: Envia USDT TRC-20 para carteira
+    A->>T: Envia USDT TRC-20 (~$1.44)
     T-->>A: txHash
 
-    A->>J: Deposita USDT (supply)
-    J-->>A: txHash
-
     A->>A: Atualiza saldo + cria snapshot
+
+    opt Yield habilitado (Etapa 3)
+        A->>Av: Deposita USDT
+        Av-->>A: aUSDT
+    end
+
     A-->>D: Confirmação (email/webhook)
 ```
 
@@ -126,31 +134,27 @@ pending → confirmed → failed
 sequenceDiagram
     participant B as Beneficiário
     participant A as Clareo API
-    participant J as JustLend
-    participant T as TRON Sidecar
+    participant Av as Aave V3
     participant X as Binance
-    participant P as NOWPayments (Off-ramp)
+    participant N as NOWPayments
 
     B->>A: POST /withdrawals (valor R$)
     A->>A: Valida dados + calcula USDT necessário
 
-    A->>J: Consulta saldo JustLend
-    J-->>A: saldo USDT
+    A->>Av: Consulta saldo Aave
+    Av-->>A: saldo USDT
 
     alt Saldo suficiente
-        A->>J: Redeem USDT do JustLend
-        J-->>A: txHash
+        A->>Av: Redeem USDT
+        Av-->>A: txHash
 
-        A->>T: Envia USDT da carteira JustLend para Binance
-        T-->>A: txHash
-
-        A->>X: Vende USDT para BRL
+        A->>X: Vende USDT para BRL (0.1%)
         X-->>A: BRL na conta Binance
 
-        A->>P: Cria withdrawal (USDT → PIX)
-        P-->>A: withdrawal_id
+        A->>N: Cria withdrawal USDT → PIX (0.5%)
+        N-->>A: withdrawal_id
 
-        P->>B: PIX enviado
+        N->>B: PIX enviado
         A-->>B: Confirmação
     else Saldo insuficiente
         A-->>B: Erro: saldo insuficiente
@@ -163,7 +167,7 @@ sequenceDiagram
 pending → processing → completed → failed
    │          │           │
    │          │           └── PIX enviado
-   │          └── Sacando do JustLend + convertendo
+   │          └── Sacando do Aave + convertendo
    └── Solicitação criada
 ```
 
@@ -175,15 +179,15 @@ pending → processing → completed → failed
 sequenceDiagram
     participant S as Sidekiq Job
     participant A as Clareo API
-    participant J as JustLend
+    participant Av as Aave V3
 
     loop A cada 24h
         S->>A: YieldMonitorJob.perform
-        A->>J: Consulta APY atual
-        J-->>A: APY (ex: 1.35%)
+        A->>Av: Consulta APY atual
+        Av-->>A: APY (ex: 4.5%)
 
-        A->>J: Consulta saldo de cada carteira
-        J-->>A: saldo USDT
+        A->>Av: Consulta saldo de cada carteira
+        Av-->>A: saldo USDT
 
         A->>A: Calcula ganho = saldo × APY/365
         A->>A: Salva YieldSnapshot
@@ -194,15 +198,6 @@ sequenceDiagram
         end
     end
 ```
-
-### Snapshot contém
-
-| Campo | Descrição |
-|-------|-----------|
-| `balance` | Saldo naquele momento |
-| `apy` | APY do JustLend |
-| `earned` | Ganhos acumulados |
-| `date` | Data do snapshot |
 
 ---
 
@@ -226,112 +221,19 @@ sequenceDiagram
     loop Cada request autenticado
         C->>A: GET /api/v1/wallets + Authorization: Bearer eyJ...
         A->>A: JWT.decode(token)
-        A->>R: Verifica se token está na blacklist
-        R-->>A: não está
         A->>A: Continua processamento
         A-->>C: Resposta
     end
-
-    C->>A: POST /auth/logout
-    A->>R: Adiciona token à blacklist (TTL: 24h)
-    A-->>C: { status: "logged_out" }
 ```
 
 ---
 
-## 7. Arquitetura de Services
-
-```mermaid
-graph TB
-    subgraph "Controllers"
-        AC[AuthController]
-        DC[DonationsController]
-        WC[WalletsController]
-        WDC[WithdrawalsController]
-        YC[YieldController]
-        WHC[WebhooksController]
-    end
-
-    subgraph "Services"
-        AS[AuthService]
-        DS[DonationService]
-        BS[BinanceService]
-        TS[TronService]
-        JS[JustLendService]
-        NS[NowPaymentsService]
-        WS[WithdrawalService]
-        YS[YieldService]
-    end
-
-    subgraph "Jobs"
-        DCJ[DonationConfirmJob]
-        WPJ[WebhookProcessJob]
-        YMJ[YieldMonitorJob]
-        WDPJ[WithdrawalProcessJob]
-    end
-
-    AC --> AS
-    DC --> DS
-    WC --> TS
-    WDC --> WS
-    YC --> YS
-    WHC --> WPJ
-
-    DS --> BS
-    DS --> TS
-    DS --> JS
-    DS --> NS
-    WS --> BS
-    WS --> JS
-    WS --> NS
-    YS --> JS
-
-    WPJ --> DCJ
-    WPJ --> WDPJ
-    YMJ --> YS
-```
-
----
-
-## 8. Diagrama de Deploy
-
-```mermaid
-graph TB
-    subgraph "Produção"
-        K[Kino Server]
-        R[Rails API]
-        S[Sidekiq Worker]
-        PG[(PostgreSQL)]
-        RD[(Redis)]
-        NS[Node.js Sidecar]
-    end
-
-    subgraph "Externos"
-        B[Binance API]
-        T[TRON Network]
-        J[JustLend]
-        N[NOWPayments]
-    end
-
-    K --> R
-    R --> PG
-    R --> RD
-    S --> RD
-    S --> R
-    R --> NS
-    NS --> T
-    NS --> J
-    R --> B
-    R --> N
-```
-
----
-
-## Resumo das Integrações
+## 7. Resumo das Integrações
 
 | API | O que faz | Quando usa | Custo |
 |-----|-----------|------------|-------|
-| **NOWPayments** | On-ramp (PIX→USDT) e Off-ramp (USDT→PIX) | Doação + Saque | 1-2% |
-| **Binance** | Compra/venda USDT, cotação | Doação + Saque | 0.1% |
-| **TRON** | Blockchain, carteiras, transferências | Doação + Saque | ~$0.01 |
-| **JustLend** | Yield (deposito/saque USDT) | Yield + Saque | Gas only |
+| **NOWPayments** | On-ramp (PIX→USDT) | Doação | 0.5% |
+| **Binance** | Compra/venda USDT | Doação + Saque | 0.1% |
+| **TRON** | Blockchain, carteiras | Doação + Saque | ~$1.44 |
+| **Aave V3** | Yield (deposito/saque) | Yield | Gas only |
+| **Solana** | Low-fee transfers | Micro-transações | $0.0004 |

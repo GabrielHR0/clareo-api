@@ -11,9 +11,9 @@ Doadores que querem ajudar projetos, instituições ou influenciadores enfrentam
 ## A Solução
 
 O **Clareo** é uma plataforma SaaS que:
-1. Aceita doações em BRL via métodos digitais (PIX, cartão, boleto)
+1. Aceita doações em BRL via PIX
 2. Converte automaticamente para USDT (criptomoeda estável)
-3. Deposita em protocolos de yield (JustLend) para gerar rendimento
+3. Deposita em protocolos de yield (Aave V3) para gerar rendimento
 4. Permite que beneficiários recebam saques a qualquer momento
 
 ## Modelo de Receita
@@ -26,27 +26,41 @@ O **Clareo** é uma plataforma SaaS que:
 
 ## Stack Tecnológica
 
-| Camada | Tecnologia |
-|--------|------------|
-| Backend | Ruby 4.0.6 + Rails 8.1.3 (API mode) |
-| Web Server | Kino (Ractor-based, Rust Tokio/Hyper) |
-| Banco | PostgreSQL |
-| Cache/Filas | Redis + Sidekiq |
-| Blockchain | TRON (TRC-20) via TronWeb |
-| Criptografia | Binance API (conversão BRL↔USDT) |
-| Yield | JustLend DAO |
-| On/Off-ramp | NOWPayments (PIX) |
+| Camada | Tecnologia | Justificativa |
+|--------|------------|---------------|
+| Backend | Ruby 4.0.6 + Rails 8.1 (API mode) | Produtividade, ecossistema |
+| Web Server | **Kino** (Rust Tokio/Hyper + Ractors) | 1.5-1.7x mais throughput que Puma |
+| Banco | PostgreSQL | Confiável, JSONB para metadata |
+| Cache/Filas | Redis + Sidekiq | Jobs assíncronos, cache |
+| Blockchain | TRON (TRC-20) + Solana | TRON: liquidez / Solana: fees baixas |
+| Exchange | Binance API (principal) + Mercado Bitcoin (fallback) | Melhor preço + compliance |
+| Yield | Aave V3 (3-5% APY) | Battle-tested, multi-chain |
+| On/Off-ramp | NOWPayments (PIX widget) | Widget pronto, non-custodial |
+
+## Por que Kino?
+
+- **Performance:** 1.5-1.7x mais throughput que Puma em I/O
+- **HTTP/2 nativo:** +79% sobre HTTP/1.1, sem nginx
+- **Memória:** ~4x menos que Puma cluster
+- **Ractor-ready:** Parallelismo real quando Rails suportar Ractors
+- **Rust front-end:** Tokio/Hyper para I/O de alta performance
+- **Config DSL familiar:** Mesmo estilo do Puma, fácil migração
+- **Produção pronta:** Graceful drain, crash supervision, timeouts
+
+> **Nota:** Rails ainda não suporta Ractors oficialmente. Kino roda em `:threaded` mode
+> para Rails, mas já usa Rust para I/O — mesmo sem Ractors, é mais rápido que Puma.
 
 ## Público-Alvo
 
 - Instituições de caridade
 - Influenciadores digitais
 - Projetos comunitários
--ONGs e startups de impacto social
+- ONGs e startups de impacto social
 
 ## Termos Chave
 
 - **Custodial:** A plataforma mantém as chaves privadas das carteiras
 - **USDT TRC-20:** Tether (stablecoin) na rede TRON
 - **Yield:** Rendimento gerado ao emprestar USDT em protocolos DeFi
-- **JustLend:** Protocolo de lending na rede TRON
+- **Aave:** Maior protocolo de lending descentralizado
+- **SPSAV:** Sociedade Prestadora de Serviços de Ativos Virtuais (regulamentação Brasil)
