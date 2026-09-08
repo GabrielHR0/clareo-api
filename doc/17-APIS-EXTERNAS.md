@@ -1,4 +1,4 @@
-# Clareo — APIs Externas Detalhadas
+# Clareo — APIs Externas Detalhadas (MVP)
 
 ## Mapa das Integrações
 
@@ -10,6 +10,7 @@ graph TB
 
     subgraph "NOWPayments"
         N1[On-ramp: BRL → USDT]
+        N2[Off-ramp: USDT → BRL]
         N3[Webhook: payment_status]
     end
 
@@ -26,14 +27,8 @@ graph TB
         T4[GET /transaction/:txHash]
     end
 
-    subgraph "Aave V3"
-        A1[POST /aave/supply]
-        A2[POST /aave/withdraw]
-        A3[GET /aave/balance/:address]
-        A4[GET /aave/apy]
-    end
-
     API --> N1
+    API --> N2
     API --> N3
     API --> B1
     API --> B2
@@ -42,10 +37,6 @@ graph TB
     API --> T2
     API --> T3
     API --> T4
-    API --> A1
-    API --> A2
-    API --> A3
-    API --> A4
 ```
 
 ---
@@ -57,6 +48,7 @@ Gateway de pagamento que aceita PIX e converte para USDT.
 
 ### Quando usar
 - **Doação:** Doador paga R$ via PIX → NOWPayments converte para USDT
+- **Saque:** Instituição solicita saque → NOWPayments envia PIX
 
 ### Endpoints
 
@@ -64,11 +56,18 @@ Gateway de pagamento que aceita PIX e converte para USDT.
 |----------|--------|-----------|
 | `/v1/payment` | POST | Cria pagamento (on-ramp) |
 | `/v1/payment/:id` | GET | Consulta status |
+| `/v1/payout` | POST | Envia PIX (off-ramp) |
 
-### Fluxo
+### Fluxo Doação
 
 ```
 Doador (PIX) → NOWPayments → USDT TRC-20 → Clareo
+```
+
+### Fluxo Saque
+
+```
+Clareo → USDT → NOWPayments → PIX → Instituição
 ```
 
 ### Webhook (IPN)
@@ -128,49 +127,11 @@ TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 
 ---
 
-## Aave V3 — Detalhes
-
-### O que é
-Maior protocolo de lending descentralizado — deposita USDT e recebe yield (3-5% APY).
-
-### Como funciona
-
-```
-Deposita USDT → Recebe aUSDT → aUSDT gera yield → Saca USDT
-```
-
-### Endpoints
-
-| Endpoint | Método | O que faz |
-|----------|--------|-----------|
-| `/aave/apy` | GET | Consulta APY atual |
-| `/aave/supply` | POST | Deposita USDT |
-| `/aave/withdraw` | POST | Saca USDT |
-| `/aave/balance/:address` | GET | Saldo em aUSDT + USDT |
-
-### Contratos
-
-| Contrato | Endereço (Ethereum) |
-|----------|---------------------|
-| Aave Pool | `0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2` |
-| USDT | `0xdAC17F958D2ee523a2206206994597C13D831ec7` |
-
-### Fluxo
-
-```
-1. Aprovar USDT para Aave (approve)
-2. Depositar USDT (supply) → recebe aUSDT
-3. aUSDT cresce a cada bloco (yield)
-4. Saca USDT (withdraw) → devolve aUSDT + juros
-```
-
----
-
 ## Resumo de Custos por Transação
 
-| Ação | NOWPayments | Binance | TRON | Aave |
-|------|-------------|---------|------|------|
-| Doação R$100 | ~R$0.50 | ~R$0.10 | ~$1.44 | Gas |
-| Saque R$100 | ~R$0.50 | ~R$0.10 | ~$1.44 | Gas |
-| Consulta cotação | - | Grátis | - | - |
+| Ação | NOWPayments | Binance | TRON | Total |
+|------|-------------|---------|------|-------|
+| Doação R$100 | ~R$0.50 | ~R$0.10 | ~R$1.44 | **R$2.04** |
+| Saque R$100 | ~R$0.50 | ~R$0.10 | - | **R$0.60** |
+| Consulta cotação | - | Grátis | - | Grátis |
 | Consulta saldo | - | Grátis | Grátis | Grátis |

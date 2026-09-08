@@ -1,11 +1,12 @@
 # Clareo — Documentação do Projeto
 
-> Plataforma SaaS de doações com conversão automática para USDT e geração de yield via Aave V3.
+> Plataforma SaaS de doações com conversão automática para USDT e resgate via PIX.
 
 ## Comece por aqui
 
 1. [Visão Geral](01-VISAO-GERAL.md)
 2. [Arquitetura](02-ARQUITETURA.md)
+3. [Plano de Execução](19-PLANO-EXECUCAO.md)
 
 ## Modelos e Dados
 
@@ -19,8 +20,7 @@
 
 5. [Integração Binance](05-INTEGRACAO-BINANCE.md)
 6. [Integração TRON](06-INTEGRACAO-TRON.md)
-7. [Integração Aave V3](07-INTEGRACAO-AAVE.md)
-8. [Integração NOWPayments](08-INTEGRACAO-NOWPAYMENTS.md)
+7. [Integração NOWPayments](08-INTEGRACAO-NOWPAYMENTS.md)
 
 ## Segurança e Autenticação
 
@@ -45,8 +45,3 @@
 
 16. [Diagramas](16-DIAGRAMAS.md)
 17. [APIs Externas](17-APIS-EXTERNAS.md)
-
-## Referências Históricas
-
-18. [Análise do Planejamento](18-ANALISE-PLANEJAMENTO.md)
-19. [Plano de Execução](19-PLANO-EXECUCAO.md)

@@ -1,4 +1,4 @@
-# Clareo — Diagramas de Fluxo
+# Clareo — Diagramas de Fluxo (MVP)
 
 ## 1. Visão Geral do Sistema
 
@@ -8,7 +8,7 @@ graph TB
         A[Browser/Mobile]
     end
 
-    subgraph "Clareo API (Rails 8.1 + Puma)"
+    subgraph "Clareo API (Rails 8.1 + Kino)"
         B[API Controller]
         C[Service Layer]
     end
@@ -26,8 +26,6 @@ graph TB
         G[NOWPayments]
         H[Binance]
         I[TRON Network]
-        J[Aave V3]
-        K[Solana]
     end
 
     A -->|HTTPS| B
@@ -39,8 +37,6 @@ graph TB
     C --> G
     C --> H
     C --> I
-    C --> J
-    C --> K
 ```
 
 ---
@@ -51,6 +47,7 @@ graph TB
 graph LR
     subgraph "NOWPayments (PIX Widget)"
         N1[BRL via PIX] -->|On-ramp| N2[USDT TRC-20]
+        N3[BRL via PIX] -->|Off-ramp| N4[USDT TRC-20]
     end
 
     subgraph "Binance (Exchange)"
@@ -62,17 +59,6 @@ graph LR
     subgraph "TRON (Blockchain)"
         T1[Carteira] -->|Envia ~$1.44| T2[USDT TRC-20]
         T2 -->|Recebe| T3[Carteira]
-    end
-
-    subgraph "Aave V3 (Yield)"
-        J1[Deposita USDT] -->|Supply| J2[aUSDT]
-        J2 -->|Withdraw| J3[Saca USDT]
-        J4[APY 3-5%] -.->|Rendimento| J2
-    end
-
-    subgraph "Solana (Low-fee)"
-        S1[Carteira] -->|Envia $0.0004| S2[USDT SPL]
-        S2 -->|Recebe| S3[Carteira]
     end
 ```
 
@@ -87,7 +73,6 @@ sequenceDiagram
     participant N as NOWPayments
     participant B as Binance
     participant T as TRON Network
-    participant Av as Aave V3
 
     D->>A: POST /donations (valor R$)
     A->>A: Valida dados
@@ -107,12 +92,7 @@ sequenceDiagram
     A->>T: Envia USDT TRC-20 (~$1.44)
     T-->>A: txHash
 
-    A->>A: Atualiza saldo + cria snapshot
-
-    opt Yield habilitado (Etapa 3)
-        A->>Av: Deposita USDT
-        Av-->>A: aUSDT
-    end
+    A->>A: Atualiza saldo
 
     A-->>D: Confirmação (email/webhook)
 ```
@@ -122,7 +102,7 @@ sequenceDiagram
 ```
 pending → confirmed → failed
    │          │
-   │          └── USDT convertido e depositado
+   │          └── USDT convertido e depositado na wallet
    └── Pagamento criado no NOWPayments
 ```
 
@@ -132,32 +112,32 @@ pending → confirmed → failed
 
 ```mermaid
 sequenceDiagram
-    participant B as Beneficiário
+    participant I as Instituição
     participant A as Clareo API
-    participant Av as Aave V3
     participant X as Binance
     participant N as NOWPayments
+    participant T as TRON Network
 
-    B->>A: POST /withdrawals (valor R$)
+    I->>A: POST /withdrawals (valor R$)
     A->>A: Valida dados + calcula USDT necessário
 
-    A->>Av: Consulta saldo Aave
-    Av-->>A: saldo USDT
+    A->>T: Consulta saldo da wallet
+    T-->>A: saldo USDT
 
     alt Saldo suficiente
-        A->>Av: Redeem USDT
-        Av-->>A: txHash
-
         A->>X: Vende USDT para BRL (0.1%)
         X-->>A: BRL na conta Binance
 
-        A->>N: Cria withdrawal USDT → PIX (0.5%)
+        A->>T: Transfere USDT (se necessário)
+        T-->>A: txHash
+
+        A->>N: Envia PIX (0.5%)
         N-->>A: withdrawal_id
 
-        N->>B: PIX enviado
-        A-->>B: Confirmação
+        N->>I: PIX enviado
+        A-->>I: Confirmação
     else Saldo insuficiente
-        A-->>B: Erro: saldo insuficiente
+        A-->>I: Erro: saldo insuficiente
     end
 ```
 
@@ -167,41 +147,13 @@ sequenceDiagram
 pending → processing → completed → failed
    │          │           │
    │          │           └── PIX enviado
-   │          └── Sacando do Aave + convertendo
+   │          └── Convertendo USDT → BRL
    └── Solicitação criada
 ```
 
 ---
 
-## 5. Fluxo de Yield (Monitoramento)
-
-```mermaid
-sequenceDiagram
-    participant S as Sidekiq Job
-    participant A as Clareo API
-    participant Av as Aave V3
-
-    loop A cada 24h
-        S->>A: YieldMonitorJob.perform
-        A->>Av: Consulta APY atual
-        Av-->>A: APY (ex: 4.5%)
-
-        A->>Av: Consulta saldo de cada carteira
-        Av-->>A: saldo USDT
-
-        A->>A: Calcula ganho = saldo × APY/365
-        A->>A: Salva YieldSnapshot
-        A->>A: Atualiza saldo wallet
-
-        alt Ganho > threshold
-            A->>A: Notifica admin
-        end
-    end
-```
-
----
-
-## 6. Fluxo de Autenticação
+## 5. Fluxo de Autenticação
 
 ```mermaid
 sequenceDiagram
@@ -228,12 +180,62 @@ sequenceDiagram
 
 ---
 
-## 7. Resumo das Integrações
+## 6. Resumo das Integrações
 
 | API | O que faz | Quando usa | Custo |
 |-----|-----------|------------|-------|
-| **NOWPayments** | On-ramp (PIX→USDT) | Doação | 0.5% |
+| **NOWPayments** | On-ramp (PIX→USDT) + Off-ramp (USDT→PIX) | Doação + Saque | 0.5% |
 | **Binance** | Compra/venda USDT | Doação + Saque | 0.1% |
-| **TRON** | Blockchain, carteiras | Doação + Saque | ~$1.44 |
-| **Aave V3** | Yield (deposito/saque) | Yield | Gas only |
-| **Solana** | Low-fee transfers | Micro-transações | $0.0004 |
+| **TRON** | Blockchain, carteiras, transferências | Doação + Saque | ~$1.44 |
+
+---
+
+## 7. Architecture: Strategy Pattern
+
+```mermaid
+classDiagram
+    class ExchangeInterface {
+        <<interface>>
+        +buy_usdt(amount_brl)
+        +sell_usdt(amount_usdt)
+        +get_price()
+        +get_balance(asset)
+    }
+
+    class BlockchainInterface {
+        <<interface>>
+        +create_wallet()
+        +get_balance(address)
+        +transfer_usdt(from_key, to_address, amount)
+    }
+
+    class PaymentInterface {
+        <<interface>>
+        +create_payment(amount_brl, order_id)
+        +send_pix(amount_brl, pix_key)
+        +verify_ipn_signature(signature, body)
+    }
+
+    class BinanceService {
+        +buy_usdt(amount_brl)
+        +sell_usdt(amount_usdt)
+        +get_price()
+        +get_balance(asset)
+    }
+
+    class TronService {
+        +create_wallet()
+        +get_balance(address)
+        +transfer_usdt(from_key, to_address, amount)
+    }
+
+    class NowPaymentsService {
+        +create_payment(amount_brl, order_id)
+        +send_pix(amount_brl, pix_key)
+        +verify_ipn_signature(signature, body)
+    }
+
+    ExchangeInterface <|.. BinanceService
+    BlockchainInterface <|.. TronService
+    PaymentInterface <|.. NowPaymentsService
+```

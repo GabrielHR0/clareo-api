@@ -13,18 +13,16 @@ Doadores que querem ajudar projetos, instituições ou influenciadores enfrentam
 O **Clareo** é uma plataforma SaaS que:
 1. Aceita doações em BRL via PIX
 2. Converte automaticamente para USDT (criptomoeda estável)
-3. Deposita em protocolos de yield (Aave V3) para gerar rendimento
-4. Permite que beneficiários recebam saques a qualquer momento
+3. Armazena em wallet TRON (custódia segura)
+4. Permite que instituições resgatem a qualquer momento via PIX
 
-## Modelo de Receita
+## Modelo de Receita (MVP)
 
 | Fonte | Descrição |
 |-------|-----------|
 | Taxa de serviço | 2% cobrado por doação |
-| Yield gerado | Rendimento do USDT depositado (fica com a plataforma) |
-| Planos SaaS | Básico (2.5%), Pro (2%), Enterprise (1.5%) |
 
-## Stack Tecnológica
+## Stack Tecnológica (MVP)
 
 | Camada | Tecnologia | Justificativa |
 |--------|------------|---------------|
@@ -32,10 +30,9 @@ O **Clareo** é uma plataforma SaaS que:
 | Web Server | **Kino** (Rust Tokio/Hyper + Ractors) | 1.5-1.7x mais throughput que Puma |
 | Banco | PostgreSQL | Confiável, JSONB para metadata |
 | Cache/Filas | Redis + Sidekiq | Jobs assíncronos, cache |
-| Blockchain | TRON (TRC-20) + Solana | TRON: liquidez / Solana: fees baixas |
-| Exchange | Binance API (principal) + Mercado Bitcoin (fallback) | Melhor preço + compliance |
-| Yield | Aave V3 (3-5% APY) | Battle-tested, multi-chain |
-| On/Off-ramp | NOWPayments (PIX widget) | Widget pronto, non-custodial |
+| Blockchain | TRON (TRC-20) | Deep liquidity, universal support |
+| Exchange | Binance API | 0.1% fee, melhor preço |
+| Gateway | NOWPayments (PIX) | Widget pronto, 0.5% fee |
 
 ## Por que Kino?
 
@@ -53,14 +50,14 @@ O **Clareo** é uma plataforma SaaS que:
 ## Público-Alvo
 
 - Instituições de caridade
-- Influenciadores digitais
+- ONGs
 - Projetos comunitários
-- ONGs e startups de impacto social
+- Startups de impacto social
 
 ## Termos Chave
 
 - **Custodial:** A plataforma mantém as chaves privadas das carteiras
 - **USDT TRC-20:** Tether (stablecoin) na rede TRON
-- **Yield:** Rendimento gerado ao emprestar USDT em protocolos DeFi
-- **Aave:** Maior protocolo de lending descentralizado
+- **NOWPayments:** Gateway de pagamento que aceita PIX
+- **Binance:** Exchange para compra/venda de USDT
 - **SPSAV:** Sociedade Prestadora de Serviços de Ativos Virtuais (regulamentação Brasil)

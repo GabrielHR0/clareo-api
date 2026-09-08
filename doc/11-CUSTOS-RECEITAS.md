@@ -6,11 +6,11 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 
 ## Fontes de Receita
 
-| Fonte | Descrição | Margem |
-|-------|-----------|--------|
-| **Taxa de serviço** | 2% cobrado por doação | Alta |
-| **Yield gerado** | Rendimento USDT (Aave V3) | 100% |
-| **Planos SaaS** | Básico/Pro/Enterprise | 80% |
+| Fonte | Descrição | Margem | Status |
+|-------|-----------|--------|--------|
+| **Taxa de serviço** | 2% cobrado por doação | Alta | **MVP** |
+| **Yield gerado** | Rendimento USDT (Aave V3) | 100% | Futuro |
+| **Planos SaaS** | Básico/Pro/Enterprise | 80% | Futuro |
 
 ## Custos Variáveis por Doação (R$100)
 
@@ -34,7 +34,7 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 
 ## Margem por Doação
 
-### Etapa 1
+### MVP (sem yield)
 
 | Item | Valor |
 |------|-------|
@@ -43,7 +43,7 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | **Lucro por doação** | **-R$0.04** |
 | **Margem** | **-2%** |
 
-### Etapa 3 (com yield)
+### Com yield (futuro)
 
 | Item | Valor |
 |------|-------|
@@ -53,7 +53,7 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | **Lucro por doação** | **R$1.01** |
 | **Margem** | **50.5%** |
 
-## Yield Estimado (4% APY - Aave V3)
+## Yield Estimado (futuro, 4% APY - Aave V3)
 
 | Volume Mensal | Yield Mensal | Yield Anual |
 |---------------|--------------|-------------|
@@ -63,7 +63,7 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | R$500.000 | R$5.500 | R$66.000 |
 | R$1.000.000 | R$11.000 | R$132.000 |
 
-## Planos SaaS
+## Planos SaaS (futuro)
 
 | Plano | Taxa | Doações/mês | Preço |
 |-------|------|-------------|-------|
@@ -71,7 +71,7 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | Pro | 2.0% | 1.000 | R$97/mês |
 | Enterprise | 1.5% | Ilimitado | R$497/mês |
 
-## Break-Even
+## Break-Even (MVP, sem yield)
 
 | Custo Fixo Mensal | Doações Necessárias (R$100 média) |
 |-------------------|-----------------------------------|
@@ -79,7 +79,7 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | R$1.000 | ~556 doações |
 | R$2.000 | ~1.112 doações |
 
-## Custos Fixos Mensais
+## Custos Fixos Mensais (MVP)
 
 | Item | Custo |
 |------|-------|
@@ -96,19 +96,18 @@ Plataforma SaaS de doações com conversão automática para USDT e geração de
 | Modelo | Custo Total | % |
 |--------|-------------|---|
 | Modelo Atual (docs) | R$3.14 | 3.14% |
-| Etapa 1 | R$2.04 | 2.04% |
-| Etapa 3 | R$1.00 | 1.00% |
+| **MVP** | **R$2.04** | **2.04%** |
 
 ### Saque de R$100
 
 | Modelo | Custo Total | % |
 |--------|-------------|---|
 | Modelo Atual (docs) | R$1.70 | 1.70% |
-| Etapa 2+ | R$0.60 | 0.60% |
+| **MVP** | **R$0.60** | **0.60%** |
 
 ## Economia Anual (R$100k/mês volume)
 
 | Modelo | Custo Anual | Economia |
 |--------|-------------|----------|
 | Modelo Atual | R$37.680 | - |
-| Etapa 3 | R$12.000 | **R$25.680 (68%)** |
+| MVP | R$24.480 | **R$13.200 (35%)** |

@@ -24,16 +24,16 @@
 │                     RAILS API                                   │
 │                  (Ruby 4.0.6 + Rails 8.1)                       │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│  │ Auth     │ │Donations │ │ Wallets  │ │Yield     │           │
+│  │ Auth     │ │Donations │ │ Wallets  │ │Withdrawals│           │
 │  │Controller│ │Controller│ │Controller│ │Controller│           │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
 │       │             │             │             │                 │
 │       ▼             ▼             ▼             ▼                 │
 │  ┌─────────────────────────────────────────────────────┐        │
 │  │              SERVICE LAYER                          │        │
-│  │  • BinanceService    • TronService                 │        │
-│  │  • AaveService       • NowPaymentsService          │        │
-│  │  • YieldService      • WithdrawalService           │        │
+│  │  • ExchangeInterface  • BlockchainInterface        │        │
+│  │  • PaymentInterface   • DonationService            │        │
+│  │  • WithdrawalService  • AuthService                │        │
 │  └─────────────────────────────────────────────────────┘        │
 └───────────┬─────────────────────────────────────┬───────────────┘
             │                                     │
@@ -59,8 +59,7 @@
             ▼                                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    EXTERNOS                                      │
-│  • Binance API    • TRON Network    • Aave V3                  │
-│  • NOWPayments    • Solana          • Mercado Bitcoin           │
+│  • Binance API    • TRON Network    • NOWPayments              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,24 +86,19 @@
 
 **Rails:** Kino roda em `:threaded` mode (Rails não suporta Ractors ainda), mas o Rust front-end já traz ganhos significativos.
 
-### Por que TRON + Solana?
+### Por que TRON?
 
-- **TRON:** 52% do volume de stablecoins, deep liquidity, universal support
-- **Solana:** $0.0004 por transferência (2.500x mais barato que TRON)
-- **Estratégia:** TRON para valores > $50, Solana para micro-transações
+- **Liquidez:** 52% do volume de stablecoins
+- **Universal:** Aceito em todas as exchanges e wallets
+- **Custo:** ~$0.14 por transferência TRC-20
+- **Simples:** Uma blockchain, um padrão
 
-### Por que Binance + Mercado Bitcoin?
+### Por que Binance?
 
-- **Binance:** 0.1% fee, melhor liquidez, API robusta
-- **Mercado Bitcoin:** SPSAV autorizado, compliance garantido, fallback
-- **Estratégia:** Binance como primário, MB como backup/compliance
-
-### Por que Aave e não JustLend?
-
-- **APY:** Aave 3-5% vs JustLend 1.35%
-- **Risco:** Aave é o maior protocolo DeFi ($38.6B TVL)
-- **Multi-chain:** Aave funciona em 15+ blockchains
-- **Liquidez:** Saque a qualquer momento sem penalty
+- **Taxa:** 0.1% (0.075% com BNB)
+- **Liquidez:** Maior exchange do mundo
+- **API:** Robusta e bem documentada
+- **Par USDTBRL:** Disponível para compra/venda direta
 
 ### Por que NOWPayments para PIX?
 
@@ -115,9 +109,8 @@
 
 ## Fluxo de Dados
 
-1. **Doação:** Doador → NOWPayments → Binance → USDT → TRON/Solana → Aave
-2. **Saque:** Beneficiário → Aave → Binance → PIX → Beneficiário
-3. **Yield:** Sidekiq job (24h) → Aave API → Calcula rendimento → Atualiza saldo
+1. **Doação:** Doador → NOWPayments → Binance → USDT → TRON → Wallet
+2. **Saque:** Instituição → Binance → USDT → BRL → PIX → Instituição
 
 ## Cache e Performance
 
