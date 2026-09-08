@@ -25,3 +25,8 @@
 ## Referências
 
 9. [Referências](14-REFERENCIAS.md)
+
+## Planejamento (Lexxen)
+
+10. [Planejamento com Lexxen](planejamento-lexxen/00-PLANEJAMENTO.md)
+11. [Referência Lexxen API](planejamento-lexxen/01-LEXXEN-REFERENCE.md)
