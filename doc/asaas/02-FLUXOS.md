@@ -308,6 +308,222 @@ pending → awaiting_credit → done
 
 ---
 
+## Fluxo 6: Criar Campanha (Pro)
+
+```
+┌──────────────┐                    ┌─────────┐
+│  Instituição │                    │  Clareo │
+└──────┬───────┘                    └────┬────┘
+       │                                 │
+       │  POST /api/v1/campaigns        │
+       │  Authorization: Bearer <jwt>   │
+       │  {                             │
+       │    title: "Ajuda...",          │
+       │    description: "...",         │
+       │    goal_amount: 5000.00,       │
+       │    start_date: "2026-09-01",   │
+       │    end_date: "2026-12-31",     │
+       │    cover_image_url: "..."      │
+       │  }                             │
+       │ ──────────────────────────────→│
+       │                                 │
+       │                                 │  1. Valida JWT + role
+       │                                 │  2. Valida subscription == pro
+       │                                 │  3. Cria Campaign
+       │                                 │
+       │  { campaign }                   │
+       │ ←──────────────────────────────│
+```
+
+**Status:** Campanha criada, visível no feed público.
+
+---
+
+## Fluxo 7: Postar Atualização (Transparência - Pro)
+
+```
+┌──────────────┐                    ┌─────────┐
+│  Instituição │                    │  Clareo │
+└──────┬───────┘                    └────┬────┘
+       │                                 │
+       │  POST /api/v1/posts            │
+       │  Authorization: Bearer <jwt>   │
+       │  {                             │
+       │    title: "Usamos R$2000...",  │
+       │    content: "Compramos...",    │
+       │    post_type: "update",        │
+       │    published_at: "2026-09-08"  │
+       │  }                             │
+       │ ──────────────────────────────→│
+       │                                 │
+       │                                 │  1. Valida JWT + role
+       │                                 │  2. Valida subscription == pro
+       │                                 │  3. Cria Post
+       │                                 │
+       │  { post }                       │
+       │ ←──────────────────────────────│
+```
+
+### 7.1 Upload de Comprovante
+
+```
+┌──────────────┐                    ┌─────────┐
+│  Instituição │                    │  Clareo │
+└──────┬───────┘                    └────┬────┘
+       │                                 │
+       │  POST /api/v1/posts/:id/attachments
+       │  Authorization: Bearer <jwt>   │
+       │  multipart/form-data           │
+       │  { file: comprovante.pdf,      │
+       │    file_type: "receipt",       │
+       │    description: "Nota fiscal" }│
+       │ ──────────────────────────────→│
+       │                                 │
+       │                                 │  1. Upload para storage
+       │                                 │  2. Cria PostAttachment
+       │                                 │
+       │  { attachment }                 │
+       │ ←──────────────────────────────│
+```
+
+### 7.2 Feed Público
+
+```
+┌─────────┐                          ┌─────────┐
+│Visitante│                          │  Clareo │
+└────┬────┘                          └────┬────┘
+     │                                     │
+     │  GET /api/v1/posts                 │
+     │  ?institution_id=123               │
+     │  &page=1&per_page=20               │
+     │ ──────────────────────────────────→│
+     │                                     │
+     │                                     │  1. Busca posts publicados
+     │                                     │  2. Inclui attachments
+     │                                     │  3. Retorna feed
+     │                                     │
+     │  { posts: [                        │
+     │    { id, title, content,           │
+     │      post_type, published_at,      │
+     │      institution: { name, logo },  │
+     │      attachments: [...] }          │
+     │  ]}                                │
+     │ ←──────────────────────────────────│
+```
+
+---
+
+## Fluxo 8: Gerar Relatório (Pro)
+
+```
+┌──────────────┐                    ┌─────────┐
+│  Instituição │                    │  Clareo │
+└──────┬───────┘                    └────┬────┘
+       │                                 │
+       │  POST /api/v1/reports          │
+       │  Authorization: Bearer <jwt>   │
+       │  {                             │
+       │    period_start: "2026-08-01", │
+       │    period_end: "2026-08-31",   │
+       │    format: "pdf"               │
+       │  }                             │
+       │ ──────────────────────────────→│
+       │                                 │
+       │                                 │  1. Valida JWT + subscription
+       │                                 │  2. Busca doações do período
+       │                                 │  3. Calcula totais
+       │                                 │  4. Gera arquivo (PDF/CSV)
+       │                                 │  5. Salva no storage
+       │                                 │  6. Cria DonationReport
+       │                                 │
+       │  { report: {                   │
+       │    id, period_start,           │
+       │    period_end, format,         │
+       │    total_donations: 45,        │
+       │    total_amount: 12500.00,     │
+       │    average_donation: 277.78,   │
+       │    download_url: "..."         │
+       │  }}                            │
+       │ ←──────────────────────────────│
+```
+
+---
+
+## Fluxo 9: Upgrade de Assinatura
+
+```
+┌──────────────┐                    ┌─────────┐                          ┌─────────┐
+│  Instituição │                    │  Clareo │                          │  Asaas  │
+└──────┬───────┘                    └────┬────┘                          └────┬────┘
+       │                                 │                                     │
+       │  POST /api/v1/subscription/upgrade
+       │  Authorization: Bearer <jwt>   │
+       │  { plan: "pro" }               │
+       │ ──────────────────────────────→│
+       │                                 │
+       │                                 │  1. Valida role == institution
+       │                                 │
+       │                                 │  2. POST /subscriptions
+       │                                 │  { customer: inst.asaas_customer_id,
+       │                                 │    billingType: "PIX",
+       │                                 │    value: 99.90,
+       │                                 │    cycle: "MONTHLY" }
+       │                                 │  ─────────────────────────────────→│
+       │                                 │                                     │
+       │                                 │  ← { id: "sub_abc123",             │
+       │                                 │      invoiceUrl: "..." }
+       │                                 │  ←─────────────────────────────────│
+       │                                 │
+       │                                 │  3. Cria/Atualiza Subscription
+       │                                 │     plan: pro
+       │                                 │     status: pending
+       │                                 │     asaas_subscription_id: sub_abc123
+       │                                 │
+       │  { subscription: {             │
+       │    plan, status,               │
+       │    invoice_url,                │
+       │    amount: 99.90               │
+       │  }}                            │
+       │ ←──────────────────────────────│
+       │                                 │
+       │  (Institui paga via PIX)        │
+       │                                 │
+       │  (Webhook: SUBSCRIPTION_CREATED │
+       │   → status: active)             │
+```
+
+---
+
+## Fluxo 10: Ver Saldo (Pro)
+
+```
+┌──────────────┐                    ┌─────────┐                          ┌─────────┐
+│  Instituição │                    │  Clareo │                          │  Asaas  │
+└──────┬───────┘                    └────┬────┘                          └────┬────┘
+       │                                 │                                     │
+       │  GET /api/v1/finance/balance   │                                     │
+       │  Authorization: Bearer <jwt>   │                                     │
+       │ ──────────────────────────────→│                                     │
+       │                                 │                                     │
+       │                                 │  1. Valida JWT + subscription      │
+       │                                 │                                     │
+       │                                 │  2. GET /wallets/{wallet_id}       │
+       │                                 │  ─────────────────────────────────→│
+       │                                 │                                     │
+       │                                 │  ← { balance: 5432.10,            │
+       │                                 │      availableBalance: 5432.10 }
+       │                                 │  ←─────────────────────────────────│
+       │                                 │
+       │  { balance: {                  │
+       │    total: 5432.10,             │
+       │    available: 5432.10,         │
+       │    currency: "BRL"             │
+       │  }}                            │
+       │ ←──────────────────────────────│
+```
+
+---
+
 ## Tratamento de Erros
 
 ### Webhook Idempotente

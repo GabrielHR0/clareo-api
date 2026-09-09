@@ -10,9 +10,13 @@ Este diretório contém os diagramas de casos de Uso do sistema Clareo, escritos
 |---------|-----------|
 | `01-VISAO-GERAL.puml` | Visão geral do sistema com todos os atores e casos de uso principais |
 | `02-DOADOR.puml` | Casos de uso do Doador (cadastro, doação, histórico) |
-| `03-INSTITUICAO.puml` | Casos de uso da Instituição (receber splits, extrato) |
+| `03-INSTITUICAO.puml` | Casos de uso da Instituição ( Gratuito + Pro: campanhas, transparência, relatórios) |
 | `04-ADMIN.puml` | Casos de uso do Admin (gerenciar instituições, relatórios) |
-| `05-INTEGRACAO-ASAAS.puml` | Integração com Asaas API (subcontas, cobranças, webhooks) |
+| `05-INTEGRACAO-ASAAS.puml` | Integração com Asaas API (subcontas, cobranças, webhooks, assinaturas) |
+| `06-CAMPANHAS.puml` | Gerenciamento de campanhas de arrecadação |
+| `07-TRANSPARENCIA.puml` | Feed público de transparência (posts, comprovantes) |
+| `08-RELATORIOS.puml` | Geração e exportação de relatórios financeiros |
+| `09-ASSINATURA.puml` | Gestão de plano gratuito e Pro (upgrade, cancelamento, faturas) |
 
 ## Como Renderizar
 
@@ -42,8 +46,9 @@ docker run -it --rm -v $(pwd):/data plantuml/plantuml /data/*.puml
 
 | Ator | Tipo | Descrição |
 |------|------|-----------|
+| **Visitante** | Pessoa | Usuário não logado (ver campanhas e feed público) |
 | **Doador** | Pessoa | Usuário que faz doações via PIX |
-| **Instituição** | Pessoa | Organização que recebe doações |
+| **Instituição** | Pessoa | Organização que recebe doações e cria conteúdo |
 | **Admin** | Pessoa | Administrador do sistema Clareo |
 | **Asaas** | Sistema | PSP (Payment Service Provider) que processa pagamentos e splits |
 
@@ -64,11 +69,22 @@ docker run -it --rm -v $(pwd):/data plantuml/plantuml /data/*.puml
 ## Fluxo Principal
 
 ```
-Doador → Seleciona Instituição → Define Valor → Paga PIX
+Doador → Seleciona Instituição/Campanha → Define Valor → Paga PIX
     ↓
 Asaas recebe pagamento
     ↓
 Split automático → Instituições recebem
     ↓
 Clareo registra e notifica
+    ↓
+Instituição posta atualização no feed (Pro)
+    ↓
+Visitante/Doador vê transparência
 ```
+
+## Modelo Freemium
+
+| Tier | Preço | Funcionalidades |
+|------|-------|-----------------|
+| **Gratuito** | R$ 0/mês | Receber splits, perfil básico, ver doações |
+| **Pro** | Mensalidade | + Campanhas, transparência, relatórios, saldo |

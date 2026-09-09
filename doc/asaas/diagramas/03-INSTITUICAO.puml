@@ -13,23 +13,40 @@ actor "Instituição" as Institution
 actor "Admin" as Admin
 actor "Asaas\n(PSP)" as Asaas
 
-rectangle "Sistema Clareo" {
+rectangle "Sistema Clareo — Tier Gratuito" {
   usecase "Cadastrar Conta" as UC1
   usecase "Fazer Login" as UC2
   usecase "Esqueci a Senha" as UC3
-  usecase "Editar Perfil" as UC4
-  usecase "Ver Doações Recebidas" as UC5
-  usecase "Ver Detalhes Split" as UC6
-  usecase "Ver Extrato" as UC7
-  usecase "Ver Status Pagamento" as UC8
-  usecase "Cadastrar Instituição\n(Admin)" as UC9
-  usecase "Aprovar Instituição\n(Admin)" as UC10
-  usecase "Solicitar Saque" as UC11
+  usecase "Ver Doações Recebidas" as UC4
+  usecase "Ver Extrato Básico" as UC5
+  usecase "Solicitar Saque" as UC6
+  usecase "Editar Perfil" as UC7
+}
+
+rectangle "Sistema Clareo — Tier Pro (Pago)" {
+  usecase "Criar Campanha" as UC8
+  usecase "Editar Campanha" as UC9
+  usecase "Pausar Campanha" as UC10
+  usecase "Encerrar Campanha" as UC11
+  usecase "Postar Atualização" as UC12
+  usecase "Upload Comprovante" as UC13
+  usecase "Gerar Relatório PDF" as UC14
+  usecase "Gerar Relatório CSV" as UC15
+  usecase "Ver Saldo Detalhado" as UC16
+  usecase "Ver Histórico\nTransações" as UC17
+  usecase "Gerenciar Assinatura" as UC18
+  usecase "Fazer Upgrade" as UC19
+  usecase "Cancelar Assinatura" as UC20
 }
 
 rectangle "Asaas (PSP)" {
   usecase "Receber Split\nAutomaticamente" as UC_A1
   usecase "Transferir PIX" as UC_A2
+  usecase "Criar Assinatura" as UC_A3
+}
+
+rectangle "Feed Público" {
+  usecase "Ver Feed\nTransparência" as UC_F1
 }
 
 Institution --> UC1
@@ -39,26 +56,36 @@ Institution --> UC4
 Institution --> UC5
 Institution --> UC6
 Institution --> UC7
+
 Institution --> UC8
+Institution --> UC9
+Institution --> UC10
 Institution --> UC11
+Institution --> UC12
+Institution --> UC13
+Institution --> UC14
+Institution --> UC15
+Institution --> UC16
+Institution --> UC17
+Institution --> UC18
+Institution --> UC19
+Institution --> UC20
 
-Admin --> UC9
-Admin --> UC10
+UC_F1 --> UC12 : visualiza
+UC_A1 --> UC4 : notifica
+UC6 ..> UC_A2 : include
+UC19 ..> UC_A3 : include
 
-UC_A1 --> UC5 : notifica
-UC11 ..> UC_A2 : include
-
-note right of UC5
-  Instituição vê todas
-  as doações que
-  recebeu via split.
+note bottom of UC_F1
+  Feed público.
+  Visitantes e doadores
+  veem as atualizações
+  da instituição.
 end note
 
-note bottom of UC_A1
-  Split é creditado
-  automaticamente
-  na subconta Asaas
-  da instituição.
+note right of UC8
+  Requer assinatura
+  Pro ativa.
 end note
 
 @enduml

@@ -22,6 +22,9 @@ rectangle "Sistema Clareo" {
   usecase "Atualizar Status\nSplit" as UC7
   usecase "Notificar\nInstituição" as UC8
   usecase "Consultar Status\nPagamento" as UC9
+  usecase "Criar Assinatura\nPro" as UC10
+  usecase "Receber Webhook\nAssinatura" as UC11
+  usecase "Atualizar\nSubscription" as UC12
 }
 
 rectangle "Asaas API" {
@@ -32,6 +35,8 @@ rectangle "Asaas API" {
   usecase "Webhook\nPAYMENT_RECEIVED" as UC_A5
   usecase "Webhook\nPAYMENT_SPLIT_DONE" as UC_A6
   usecase "GET /payments/{id}" as UC_A7
+  usecase "POST /subscriptions" as UC_A8
+  usecase "Webhook\nSUBSCRIPTION_CREATED" as UC_A9
 }
 
 rectangle "Banco Central\n(PIX)" {
@@ -42,6 +47,7 @@ Admin --> UC1
 Donor --> UC2
 Donor --> UC3
 Institution --> UC9
+Institution --> UC10
 
 UC1 ..> UC_A1 : include
 UC2 ..> UC_A2 : include
@@ -54,6 +60,9 @@ UC7 ..> UC5 : processa
 UC8 ..> UC7 : after
 UC_A4 ..> UC_B1 : executa
 UC9 ..> UC_A7 : consulta
+UC10 ..> UC_A8 : include
+UC11 ..> UC_A9 : receive
+UC12 ..> UC11 : processa
 
 note top of UC_A4
   Asaas divide
@@ -68,11 +77,10 @@ note right of UC_B1
   na hora.
 end note
 
-note bottom of UC_A5
-  Clareo recebe
-  notificação
-  quando pagamento
-  é confirmado.
+note bottom of UC_A9
+  Webhook confirma
+  criação da
+  assinatura Pro.
 end note
 
 @enduml

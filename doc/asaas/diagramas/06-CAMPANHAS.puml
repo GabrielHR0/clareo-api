@@ -1,0 +1,73 @@
+@startuml Clareo - Campanhas
+!theme plain
+left to right direction
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam packageFontSize 14
+skinparam usecaseFontSize 12
+skinparam defaultFontName Arial
+
+title Clareo — Diagrama de Casos de Uso: Campanhas
+
+actor "Instituição" as Institution
+actor "Doador" as Donor
+actor "Visitante" as Visitor
+
+rectangle "Sistema Clareo" {
+  usecase "Criar Campanha" as UC1
+  usecase "Editar Campanha" as UC2
+  usecase "Pausar Campanha" as UC3
+  usecase "Retomar Campanha" as UC4
+  usecase "Encerrar Campanha" as UC5
+  usecase "Ver Campanhas\nAtivas" as UC6
+  usecase "Ver Detalhes\nCampanha" as UC7
+  usecase "Ver Progresso" as UC8
+  usecase "Doar para\nCampanha" as UC9
+  usecase "Ver Estatísticas" as UC10
+}
+
+rectangle "Asaas (PSP)" {
+  usecase "Criar Cobrança\ncom Split" as UC_A1
+}
+
+Institution --> UC1
+Institution --> UC2
+Institution --> UC3
+Institution --> UC4
+Institution --> UC5
+Institution --> UC10
+
+Visitor --> UC6
+Visitor --> UC7
+Visitor --> UC8
+
+Donor --> UC6
+Donor --> UC7
+Donor --> UC9
+
+UC9 ..> UC_A1 : include
+UC1 ..> UC8 : include
+UC10 ..> UC8 : include
+
+note right of UC1
+  Requer assinatura
+  Pro ativa.
+  Define título,
+  descrição, valor
+  meta, prazo.
+end note
+
+note bottom of UC6
+  Feed público com
+  todas as campanhas
+  ativas e pausadas.
+end note
+
+note right of UC8
+  Mostra progresso:
+  current_amount /
+  goal_amount
+  em tempo real.
+end note
+
+@enduml

@@ -170,6 +170,110 @@ class DonationSplit < ApplicationRecord
 end
 ```
 
+### Campaign
+
+```ruby
+class Campaign < ApplicationRecord
+  belongs_to :institution
+  has_many :donations, dependent: :nullify
+
+  enum :status, { active: 'active', paused: 'paused', closed: 'closed' }
+
+  validates :title, presence: true
+  validates :description, presence: true
+  validates :goal_amount, presence: true, numericality: { greater_than: 0 }
+  validates :start_date, presence: true
+  validates :end_date, presence: true
+  validates :status, presence: true
+
+  scope :active, -> { where(status: 'active') }
+  scope :public_feed, -> { where(status: ['active', 'paused']) }
+
+  def expired?
+    end_date < Date.current
+  end
+
+  def progress_percent
+    return 0 if goal_amount.zero?
+    ((current_amount / goal_amount) * 100).round(1)
+  end
+end
+```
+
+### Post (Transparência)
+
+```ruby
+class Post < ApplicationRecord
+  belongs_to :institution
+  has_many :post_attachments, dependent: :destroy
+
+  enum :post_type, { update: 'update', receipt: 'receipt', report: 'report' }
+
+  validates :title, presence: true
+  validates :content, presence: true
+  validates :post_type, presence: true
+  validates :published_at, presence: true
+
+  scope :published, -> { where('published_at <= ?', Time.current) }
+  scope :by_institution, ->(inst) { where(institution: inst) }
+end
+```
+
+### PostAttachment
+
+```ruby
+class PostAttachment < ApplicationRecord
+  belongs_to :post
+
+  validates :file_url, presence: true
+  validates :file_type, presence: true
+end
+```
+
+### Subscription
+
+```ruby
+class Subscription < ApplicationRecord
+  belongs_to :institution
+
+  enum :plan, { free: 'free', pro: 'pro' }
+  enum :status, { active: 'active', canceled: 'canceled', expired: 'expired' }
+
+  validates :plan, presence: true
+  validates :status, presence: true
+
+  scope :active_pro, -> { where(plan: 'pro', status: 'active') }
+
+  def pro?
+    plan == 'pro' && status == 'active'
+  end
+
+  def features
+    if pro?
+      %i[transparency campaigns reports finance]
+    else
+      %i[basic_donations]
+    end
+  end
+end
+```
+
+### DonationReport
+
+```ruby
+class DonationReport < ApplicationRecord
+  belongs_to :institution
+
+  enum :format, { pdf: 'pdf', csv: 'csv' }
+
+  validates :period_start, presence: true
+  validates :period_end, presence: true
+  validates :format, presence: true
+
+  scope :recent, -> { order(generated_at: :desc) }
+end
+```
+
 ---
 
 ## Migrations
@@ -247,6 +351,93 @@ class CreateDonationSplits < ActiveRecord::Migration[8.0]
     end
     add_index :donation_splits, :status
     add_index :donation_splits, :asaas_split_id, unique: true
+  end
+end
+
+# 005_create_campaigns.rb
+class CreateCampaigns < ActiveRecord::Migration[8.0]
+  def change
+    create_table :campaigns do |t|
+      t.references :institution, null: false, foreign_key: true
+      t.string :title, null: false
+      t.text :description, null: false
+      t.decimal :goal_amount, precision: 15, scale: 2, null: false
+      t.decimal :current_amount, precision: 15, scale: 2, default: 0
+      t.date :start_date, null: false
+      t.date :end_date, null: false
+      t.string :cover_image_url
+      t.string :status, null: false, default: 'active'
+      t.timestamps
+    end
+    add_index :campaigns, :status
+    add_index :campaigns, [:institution_id, :status]
+  end
+end
+
+# 006_create_posts.rb
+class CreatePosts < ActiveRecord::Migration[8.0]
+  def change
+    create_table :posts do |t|
+      t.references :institution, null: false, foreign_key: true
+      t.string :title, null: false
+      t.text :content, null: false
+      t.string :post_type, null: false, default: 'update'
+      t.datetime :published_at, null: false
+      t.timestamps
+    end
+    add_index :posts, :post_type
+    add_index :posts, [:institution_id, :published_at]
+  end
+end
+
+# 007_create_post_attachments.rb
+class CreatePostAttachments < ActiveRecord::Migration[8.0]
+  def change
+    create_table :post_attachments do |t|
+      t.references :post, null: false, foreign_key: true
+      t.string :file_url, null: false
+      t.string :file_type, null: false
+      t.string :description
+      t.timestamps
+    end
+  end
+end
+
+# 008_create_subscriptions.rb
+class CreateSubscriptions < ActiveRecord::Migration[8.0]
+  def change
+    create_table :subscriptions do |t|
+      t.references :institution, null: false, foreign_key: true
+      t.string :plan, null: false, default: 'free'
+      t.string :status, null: false, default: 'active'
+      t.decimal :amount, precision: 10, scale: 2, default: 0
+      t.string :asaas_subscription_id
+      t.date :current_period_start
+      t.date :current_period_end
+      t.timestamps
+    end
+    add_index :subscriptions, [:institution_id, :plan]
+    add_index :subscriptions, :status
+  end
+end
+
+# 009_create_donation_reports.rb
+class CreateDonationReports < ActiveRecord::Migration[8.0]
+  def change
+    create_table :donation_reports do |t|
+      t.references :institution, null: false, foreign_key: true
+      t.date :period_start, null: false
+      t.date :period_end, null: false
+      t.string :format, null: false, default: 'pdf'
+      t.string :file_url
+      t.datetime :generated_at
+      t.decimal :total_donations, precision: 15, scale: 2, default: 0
+      t.decimal :total_amount, precision: 15, scale: 2, default: 0
+      t.decimal :average_donation, precision: 15, scale: 2, default: 0
+      t.jsonb :summary, default: {}
+      t.timestamps
+    end
+    add_index :donation_reports, [:institution_id, :generated_at]
   end
 end
 ```
@@ -473,6 +664,51 @@ GET    /api/v1/donations/:id          → Status da doação
 GET    /api/v1/donations              → Listar doações
 ```
 
+### Campanhas
+
+```
+POST   /api/v1/campaigns              → Criar campanha (Pro)
+GET    /api/v1/campaigns              → Listar campanhas (público)
+GET    /api/v1/campaigns/:id          → Detalhes da campanha
+PUT    /api/v1/campaigns/:id          → Editar campanha (Pro)
+DELETE /api/v1/campaigns/:id          → Encerrar campanha (Pro)
+```
+
+### Transparência (Feed Público)
+
+```
+POST   /api/v1/posts                  → Criar post (Pro)
+GET    /api/v1/posts                  → Listar posts (público)
+GET    /api/v1/posts/:id              → Detalhes do post
+PUT    /api/v1/posts/:id              → Editar post (Pro)
+DELETE /api/v1/posts/:id              → Excluir post (Pro)
+```
+
+### Relatórios
+
+```
+POST   /api/v1/reports                → Gerar relatório (Pro)
+GET    /api/v1/reports                → Listar relatórios (Pro)
+GET    /api/v1/reports/:id/download   → Baixar relatório (Pro)
+```
+
+### Assinatura
+
+```
+GET    /api/v1/subscription           → Ver plano atual
+POST   /api/v1/subscription/upgrade   → Fazer upgrade (Pro)
+POST   /api/v1/subscription/cancel    → Cancelar assinatura
+GET    /api/v1/subscription/invoices  → Ver faturas
+```
+
+### Financeiro (Pro)
+
+```
+GET    /api/v1/finance/balance        → Saldo detalhado
+GET    /api/v1/finance/transactions   → Histórico de transações
+GET    /api/v1/finance/summary        → Resumo financeiro
+```
+
 ### Webhooks
 
 ```
@@ -528,22 +764,41 @@ Clareo NÃO participa do saque da instituição.
 ### Semana 1: Setup
 - [ ] Configurar Rails + PostgreSQL + Redis
 - [ ] Migration: users, institutions, donations, donation_splits
+- [ ] Migration: campaigns, posts, post_attachments
+- [ ] Migration: subscriptions, donation_reports
 - [ ] Auth: JWT encode/decode, login, register
 - [ ] Configurar Asaas sandbox
 
-### Semana 2: Services
+### Semana 2: Services Core
 - [ ] AsaasService: create_customer, create_subaccount
 - [ ] AsaasService: create_payment (com splits)
 - [ ] DonationService: create, confirm
 - [ ] Webhook handler: PAYMENT_RECEIVED, PAYMENT_SPLIT_DONE
 
-### Semana 3: Controllers + Fluxo
+### Semana 3: Controllers Core
 - [ ] InstitutionsController: create, index, show
 - [ ] DonationsController: create, show, index
 - [ ] WebhooksController: asaas
 - [ ] RSpec: testes de service (mock)
 
-### Semana 4: Teste + Deploy
+### Semana 4: Campanhas + Transparência
+- [ ] CampaignService: create, update, close
+- [ ] PostService: create, update, delete
+- [ ] CampaignsController: CRUD
+- [ ] PostsController: CRUD + feed público
+
+### Semana 5: Assinatura + Financeiro
+- [ ] SubscriptionService: upgrade, cancel
+- [ ] FinanceService: balance, transactions
+- [ ] SubscriptionController: upgrade, cancel, invoices
+- [ ] FinanceController: balance, transactions, summary
+
+### Semana 6: Relatórios
+- [ ] ReportService: generate, download
+- [ ] ReportsController: create, list, download
+- [ ] Relatório PDF/CSV com resumo
+
+### Semana 7: Teste + Deploy
 - [ ] Teste end-to-end com sandbox Asaas
 - [ ] Deploy staging
 - [ ] Deploy produção
