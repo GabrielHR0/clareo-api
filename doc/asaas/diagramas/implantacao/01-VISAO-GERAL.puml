@@ -1,0 +1,59 @@
+@startuml Implantacao - Visao Geral
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam nodeFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+
+title Clareo — Diagrama de Implantação (Visão Geral)
+
+node "Dispositivo do Usuário" as Device {
+  artifact "Navegador Web" as Browser
+  artifact "App Bancário" as BankApp
+}
+
+cloud "Internet" as Internet
+
+node "Servidor Clareo" as Server {
+  artifact "Rails API" as Rails
+  artifact "Redis" as Redis
+  artifact "Sidekiq" as Sidekiq
+}
+
+node "Banco de Dados" as DBNode {
+  database "PostgreSQL" as PostgreSQL
+}
+
+node "Storage" as StorageNode {
+  artifact "AWS S3" as S3
+}
+
+node "Asaas (PSP)" as AsaasNode {
+  artifact "API Asaas" as AsaasAPI
+  artifact "Webhooks" as AsaasWH
+}
+
+node "Banco Central" as BCBNode {
+  artifact "SPI (PIX)" as SPI
+}
+
+' ===== Conexões =====
+
+Browser --> Internet : HTTPS
+BankApp --> Internet : HTTPS
+
+Internet --> Rails : API REST
+Internet --> AsaasAPI : API REST
+
+Rails --> PostgreSQL : TCP 5432
+Rails --> Redis : TCP 6379
+Redis --> Sidekiq : pub/sub
+
+Rails --> S3 : HTTPS
+Rails --> AsaasAPI : HTTPS
+AsaasWH --> Rails : Webhook HTTPS
+
+AsaasAPI --> SPI : PIX
+
+@enduml

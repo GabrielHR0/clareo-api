@@ -1,0 +1,100 @@
+@startuml Implantacao - Detalhado
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam nodeFontSize 12
+skinparam componentFontSize 11
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+
+title Clareo — Diagrama de Implantação (Detalhado)
+
+node "Dispositivo do Usuário" as Device {
+  component "Navegador Web" as Browser {
+    [Frontend React/Vue]
+  }
+  component "App Bancário" as BankApp
+}
+
+node "Servidor Clareo (AWS/Heroku)" as ClareoServer {
+
+  node "Container Docker" as Docker {
+    component "Rails API (Puma)" as Puma {
+      [AuthController]
+      [DonationsController]
+      [CampaignsController]
+      [PostsController]
+      [ReportsController]
+      [SubscriptionController]
+      [WebhooksController]
+    }
+
+    component "Background Jobs" as Jobs {
+      [Sidekiq Worker]
+      [DonationJob]
+      [ReportJob]
+      [WebhookJob]
+    }
+  }
+
+  node "Redis" as RedisNode {
+    component "Cache" as Cache
+    component "Queue" as Queue
+  }
+}
+
+node "Banco de Dados (AWS RDS)" as DBNode {
+  database "PostgreSQL 15" as PG {
+    table "users" as T1
+    table "institutions" as T2
+    table "donations" as T3
+    table "donation_splits" as T4
+    table "campaigns" as T5
+    table "posts" as T6
+    table "subscriptions" as T7
+    table "donation_reports" as T8
+  }
+}
+
+node "Storage (AWS S3)" as S3Node {
+  bucket "clareo-uploads" as S3Bucket {
+    folder "attachments/" as F1
+    folder "reports/" as F2
+    folder "campaigns/" as F3
+  }
+}
+
+node "Asaas (PSP)" as AsaasNode {
+  component "API v3" as AsaasAPI
+  component "Webhooks" as AsaasWH
+  component "PIX Engine" as PIX
+}
+
+node "Banco Central (SPI)" as BCBNode {
+  component "PIX Instantâneo" as PIXSPI
+}
+
+cloud "CDN (CloudFront)" as CDN
+
+' ===== Conexões =====
+
+Browser --> CDN : HTTPS
+CDN --> Puma : HTTPS
+
+BankApp --> PIX : App bancário
+
+Puma --> PG : SQL (5432)
+Puma --> RedisNode : Redis (6379)
+Puma --> AsaasAPI : HTTPS
+Puma --> S3Bucket : HTTPS
+
+Jobs --> Queue : consome
+Jobs --> PG : SQL
+Jobs --> AsaasAPI : HTTPS
+
+AsaasWH --> Puma : Webhook HTTPS
+
+AsaasAPI --> PIX : Interno
+PIX --> PIXSPI : SPI
+
+@enduml
