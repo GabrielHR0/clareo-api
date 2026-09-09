@@ -1,0 +1,348 @@
+@startuml Diagrama de Classe - Clareo
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam classFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 50
+
+title Clareo — Diagrama de Classe do Sistema
+
+' ===== Interfaces =====
+
+interface "Autenticavel" as IAuth {
+  + authenticate(email, password) : User
+  + generate_token(user_id) : String
+  + verify_token(token) : User
+}
+
+interface "Pagavel" as IPayable {
+  + create_payment(params) : Payment
+  + get_payment(id) : Payment
+  + list_payments(filters) : Array
+}
+
+interface "Notificavel" as INotifiable {
+  + send_webhook(event, data) : Boolean
+  + verify_signature(signature, body) : Boolean
+}
+
+interface "Relatoravel" as IReportable {
+  + generate_report(params) : Report
+  + download_report(id) : File
+  + list_reports(institution_id) : Array
+}
+
+' ===== Classes de Modelo =====
+
+class User {
+  - id : Integer
+  - name : String
+  - email : String
+  - password_digest : String
+  - role : String
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + has_secure_password()
+  + institutions() : Array
+  + donations() : Array
+  + donor?() : Boolean
+  + institution?() : Boolean
+  + admin?() : Boolean
+  + as_json() : Hash
+}
+
+class Institution {
+  - id : Integer
+  - user_id : Integer
+  - name : String
+  - cnpj : String
+  - description : String
+  - pix_key : String
+  - asaas_customer_id : String
+  - asaas_wallet_id : String
+  - active : Boolean
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + user() : User
+  + donation_splits() : Array
+  + campaigns() : Array
+  + posts() : Array
+  + subscription() : Subscription
+  + reports() : Array
+  + active?() : Boolean
+  + pro?() : Boolean
+  + as_json() : Hash
+}
+
+class Donation {
+  - id : Integer
+  - user_id : Integer
+  - donor_name : String
+  - donor_email : String
+  - amount_brl : Decimal
+  - fee_amount : Decimal
+  - net_amount : Decimal
+  - asaas_payment_id : String
+  - asaas_payment_url : String
+  - status : String
+  - metadata : JSON
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + user() : User
+  + donation_splits() : Array
+  + pending?() : Boolean
+  + received?() : Boolean
+  + split_done?() : Boolean
+  + failed?() : Boolean
+  + refunded?() : Boolean
+  + update_status(new_status)
+  + as_json() : Hash
+}
+
+class DonationSplit {
+  - id : Integer
+  - donation_id : Integer
+  - institution_id : Integer
+  - amount : Decimal
+  - percentual : Decimal
+  - asaas_split_id : String
+  - status : String
+  - metadata : JSON
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + donation() : Donation
+  + institution() : Institution
+  + pending?() : Boolean
+  + awaiting_credit?() : Boolean
+  + done?() : Boolean
+  + refused?() : Boolean
+  + cancelled?() : Boolean
+  + refunded?() : Boolean
+  + update_status(new_status)
+  + as_json() : Hash
+}
+
+class Campaign {
+  - id : Integer
+  - institution_id : Integer
+  - title : String
+  - description : String
+  - goal_amount : Decimal
+  - current_amount : Decimal
+  - start_date : Date
+  - end_date : Date
+  - cover_image_url : String
+  - status : String
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + institution() : Institution
+  + donations() : Array
+  + active?() : Boolean
+  + paused?() : Boolean
+  + closed?() : Boolean
+  + expired?() : Boolean
+  + progress_percent() : Float
+  + pause()
+  + resume()
+  + close()
+  + as_json() : Hash
+}
+
+class Post {
+  - id : Integer
+  - institution_id : Integer
+  - title : String
+  - content : String
+  - post_type : String
+  - published_at : DateTime
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + institution() : Institution
+  + post_attachments() : Array
+  + update?() : Boolean
+  + receipt?() : Boolean
+  + report?() : Boolean
+  + published?() : Boolean
+  + as_json() : Hash
+}
+
+class PostAttachment {
+  - id : Integer
+  - post_id : Integer
+  - file_url : String
+  - file_type : String
+  - description : String
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + post() : Post
+  + pdf?() : Boolean
+  + image?() : Boolean
+  + as_json() : Hash
+}
+
+class Subscription {
+  - id : Integer
+  - institution_id : Integer
+  - plan : String
+  - status : String
+  - amount : Decimal
+  - asaas_subscription_id : String
+  - current_period_start : Date
+  - current_period_end : Date
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + institution() : Institution
+  + free?() : Boolean
+  + pro?() : Boolean
+  + active?() : Boolean
+  + canceled?() : Boolean
+  + expired?() : Boolean
+  + features() : Array
+  + can_create_campaigns?() : Boolean
+  + can_post_updates?() : Boolean
+  + can_generate_reports?() : Boolean
+  + as_json() : Hash
+}
+
+class DonationReport {
+  - id : Integer
+  - institution_id : Integer
+  - period_start : Date
+  - period_end : Date
+  - format : String
+  - file_url : String
+  - generated_at : DateTime
+  - total_donations : Integer
+  - total_amount : Decimal
+  - average_donation : Decimal
+  - summary : JSON
+  - created_at : DateTime
+  - updated_at : DateTime
+  --
+  + initialize(params)
+  + institution() : Institution
+  + pdf?() : Boolean
+  + csv?() : Boolean
+  + generated?() : Boolean
+  + download_url() : String
+  + as_json() : Hash
+}
+
+' ===== Classes de Serviço =====
+
+class AsaasService {
+  - api_key : String
+  - base_url : String
+  --
+  + initialize()
+  + create_customer(params) : Hash
+  + create_subaccount(params) : Hash
+  + get_wallet(wallet_id) : Hash
+  + create_payment(params) : Hash
+  + get_payment(id) : Hash
+  + list_payments(params) : Hash
+  + create_subscription(params) : Hash
+  + self.verify_webhook(request) : Boolean
+  - post(path, body) : Hash
+  - get(path, params) : Hash
+  - request(method, path, body) : Hash
+}
+
+class DonationService {
+  --
+  + create(params) : Donation
+  + confirm(asaas_payment_id) : Donation
+  + calculate_splits(institution_ids, amount) : Array
+}
+
+class CampaignService {
+  --
+  + create(params, institution_id) : Campaign
+  + update(id, params) : Campaign
+  + pause(id) : Campaign
+  + resume(id) : Campaign
+  + close(id) : Campaign
+}
+
+class PostService {
+  --
+  + create(params, institution_id) : Post
+  + update(id, params) : Post
+  + delete(id) : Boolean
+  + add_attachment(post_id, file) : PostAttachment
+}
+
+class ReportService {
+  --
+  + generate(params, institution_id) : DonationReport
+  + calculate_stats(institution_id, period) : Hash
+  + generate_file(report) : String
+}
+
+class SubscriptionService {
+  --
+  + upgrade(institution_id) : Subscription
+  + cancel(institution_id) : Subscription
+  + confirm(subscription_id) : Subscription
+}
+
+class WebhookService {
+  --
+  + process(params) : Boolean
+  + handle_payment_received(payment_id) : Donation
+  + handle_split_done(payment_id) : Donation
+  + handle_subscription_created(subscription_id) : Subscription
+}
+
+' ===== Relacionamentos =====
+
+User "1" -- "0..*" Institution : possui
+User "1" -- "0..*" Donation : realiza
+
+Institution "1" -- "1" Subscription : possui
+Institution "1" -- "0..*" DonationSplit : recebe
+Institution "1" -- "0..*" Campaign : cria
+Institution "1" -- "0..* Post : publica
+Institution "1" -- "0..*" DonationReport : gera
+
+Donation "1" -- "1..*" DonationSplit : gera
+
+Campaign "0..*" -- "0..*" Donation : direciona
+
+Post "1" -- "0..*" PostAttachment : contém
+
+' ===== Dependências =====
+
+AsaasService ..|> IPayable
+AsaasService ..|> INotifiable
+DonationService ..> AsaasService : usa
+CampaignService ..> AsaasService : usa
+ReportService ..> Donation : consulta
+SubscriptionService ..> AsaasService : usa
+WebhookService ..> AsaasService : verifica
+WebhookService ..> DonationService : usa
+WebhookService ..> SubscriptionService : usa
+
+@enduml
