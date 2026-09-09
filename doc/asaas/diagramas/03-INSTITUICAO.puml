@@ -23,45 +23,36 @@ rectangle "Sistema Clareo" {
   package "Conta" {
     usecase "Cadastrar Conta" as UC1
     usecase "Fazer Login" as UC2
-    usecase "Esqueci a Senha" as UC3
-    usecase "Editar Perfil" as UC4
+    usecase "Editar Perfil" as UC3
   }
 
   package "Tier Gratuito" {
-    usecase "Ver Doações Recebidas" as UC5
-    usecase "Ver Extrato Básico" as UC6
-    usecase "Solicitar Saque" as UC7
+    usecase "Ver Doações Recebidas" as UC4
+    usecase "Ver Extrato Básico" as UC5
+    usecase "Solicitar Saque" as UC6
   }
 
   package "Campanhas (Pro)" {
-    usecase "Criar Campanha" as UC8
-    usecase "Editar Campanha" as UC9
-    usecase "Pausar Campanha" as UC10
-    usecase "Encerrar Campanha" as UC11
+    usecase "Criar Campanha" as UC7
+    usecase "Gerenciar Campanha" as UC8
   }
 
   package "Transparência (Pro)" {
-    usecase "Postar Atualização" as UC12
-    usecase "Upload Comprovante" as UC13
-    usecase "Gerenciar Posts" as UC14
+    usecase "Postar Atualização" as UC9
+    usecase "Upload Comprovante" as UC10
   }
 
   package "Relatórios (Pro)" {
-    usecase "Gerar Relatório PDF" as UC15
-    usecase "Gerar Relatório CSV" as UC16
-    usecase "Ver Resumo Financeiro" as UC17
+    usecase "Gerar Relatório" as UC11
+    usecase "Ver Resumo Financeiro" as UC12
   }
 
   package "Financeiro (Pro)" {
-    usecase "Ver Saldo Detalhado" as UC18
-    usecase "Ver Histórico Transações" as UC19
+    usecase "Ver Saldo Detalhado" as UC13
   }
 
   package "Assinatura" {
-    usecase "Ver Plano Atual" as UC20
-    usecase "Fazer Upgrade para Pro" as UC21
-    usecase "Cancelar Assinatura" as UC22
-    usecase "Ver Faturas" as UC23
+    usecase "Gerenciar Plano" as UC14
   }
 }
 
@@ -70,11 +61,6 @@ rectangle "Asaas (PSP)" {
   usecase "Receber Split" as UC_A1
   usecase "Transferir PIX" as UC_A2
   usecase "Criar Assinatura" as UC_A3
-}
-
-' ===== Feed Público =====
-rectangle "Feed Público" {
-  usecase "Visualizar Feed" as UC_F1
 }
 
 ' ===== Conexões =====
@@ -92,20 +78,10 @@ Institution --> UC11
 Institution --> UC12
 Institution --> UC13
 Institution --> UC14
-Institution --> UC15
-Institution --> UC16
-Institution --> UC17
-Institution --> UC18
-Institution --> UC19
-Institution --> UC20
-Institution --> UC21
-Institution --> UC22
-Institution --> UC23
 
 ' ===== Relacionamentos =====
-UC_F1 --> UC12 : visualiza
-UC_A1 --> UC5 : notifica
-UC7 ..> UC_A2 : <<include>>
-UC21 ..> UC_A3 : <<include>>
+UC_A1 --> UC4 : notifica
+UC6 ..> UC_A2 : <<include>>
+UC14 ..> UC_A3 : <<include>>
 
 @enduml
