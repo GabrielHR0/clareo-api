@@ -1,0 +1,67 @@
+@startuml Clareo - Doador
+!theme plain
+left to right direction
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam packageFontSize 14
+skinparam usecaseFontSize 12
+skinparam defaultFontName Arial
+
+title Clareo — Diagrama de Casos de Uso: Doador
+
+actor "Doador" as Donor
+
+rectangle "Sistema Clareo" {
+  usecase "Cadastrar Conta" as UC1
+  usecase "Fazer Login" as UC2
+  usecase "Esqueci a Senha" as UC3
+  usecase "Listar Instituições" as UC4
+  usecase "Selecionar Instituição" as UC5
+  usecase "Definir Valor Doação" as UC6
+  usecase "Gerar QR Code PIX" as UC7
+  usecase "Pagar via PIX" as UC8
+  usecase "Ver Status Doação" as UC9
+  usecase "Ver Histórico Doações" as UC10
+  usecase "Receber Confirmação" as UC11
+  usecase "Cancelar Doação" as UC12
+  usecase "Editar Perfil" as UC13
+}
+
+rectangle "Asaas (PSP)" {
+  usecase "Criar Cobrança\ncom Split" as UC_A1
+  usecase "Gerar PIX\nDinâmico" as UC_A2
+}
+
+Donor --> UC1
+Donor --> UC2
+Donor --> UC3
+Donor --> UC4
+Donor --> UC5
+Donor --> UC6
+Donor --> UC8
+Donor --> UC9
+Donor --> UC10
+Donor --> UC13
+
+UC2 ..> UC1 : include
+UC7 ..> UC6 : include
+UC7 ..> UC_A1 : include
+UC_A1 ..> UC_A2 : include
+UC8 ..> UC7 : include
+UC11 ..> UC9 : extends
+UC12 ..> UC9 : extends
+
+note right of UC8
+  O doador paga via
+  PIX usando o QR
+  Code gerado pelo
+  Asaas.
+end note
+
+note bottom of UC_A1
+  Split automático:
+  valor é dividido
+  entre instituições.
+end note
+
+@enduml

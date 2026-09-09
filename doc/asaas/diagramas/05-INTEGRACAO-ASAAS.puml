@@ -1,0 +1,78 @@
+@startuml Clareo - Integracao Asaas
+!theme plain
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam packageFontSize 14
+skinparam usecaseFontSize 12
+skinparam defaultFontName Arial
+
+title Clareo — Diagrama de Casos de Uso: Integração Asaas
+
+actor "Doador" as Donor
+actor "Instituição" as Institution
+actor "Admin" as Admin
+
+rectangle "Sistema Clareo" {
+  usecase "Criar Subconta\nInstituição" as UC1
+  usecase "Criar Cobrança\ncom Split" as UC2
+  usecase "Gerar PIX\nDinâmico" as UC3
+  usecase "Receber Webhook\nPagamento" as UC4
+  usecase "Receber Webhook\nSplit" as UC5
+  usecase "Registrar Doação" as UC6
+  usecase "Atualizar Status\nSplit" as UC7
+  usecase "Notificar\nInstituição" as UC8
+  usecase "Consultar Status\nPagamento" as UC9
+}
+
+rectangle "Asaas API" {
+  usecase "POST /subaccounts" as UC_A1
+  usecase "POST /payments\ncom splits" as UC_A2
+  usecase "PIX Dinâmico\nQR Code" as UC_A3
+  usecase "Split Automático" as UC_A4
+  usecase "Webhook\nPAYMENT_RECEIVED" as UC_A5
+  usecase "Webhook\nPAYMENT_SPLIT_DONE" as UC_A6
+  usecase "GET /payments/{id}" as UC_A7
+}
+
+rectangle "Banco Central\n(PIX)" {
+  usecase "Transferência\nInstantânea" as UC_B1
+}
+
+Admin --> UC1
+Donor --> UC2
+Donor --> UC3
+Institution --> UC9
+
+UC1 ..> UC_A1 : include
+UC2 ..> UC_A2 : include
+UC3 ..> UC_A3 : include
+UC_A2 ..> UC_A4 : include
+UC4 ..> UC_A5 : receive
+UC5 ..> UC_A6 : receive
+UC6 ..> UC4 : processa
+UC7 ..> UC5 : processa
+UC8 ..> UC7 : after
+UC_A4 ..> UC_B1 : executa
+UC9 ..> UC_A7 : consulta
+
+note top of UC_A4
+  Asaas divide
+  automaticamente
+  o valor entre
+  as instituições.
+end note
+
+note right of UC_B1
+  PIX é instantâneo.
+  Instituição recebe
+  na hora.
+end note
+
+note bottom of UC_A5
+  Clareo recebe
+  notificação
+  quando pagamento
+  é confirmado.
+end note
+
+@enduml

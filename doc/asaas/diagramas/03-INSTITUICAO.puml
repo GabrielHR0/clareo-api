@@ -1,0 +1,64 @@
+@startuml Clareo - Instituicao
+!theme plain
+left to right direction
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam packageFontSize 14
+skinparam usecaseFontSize 12
+skinparam defaultFontName Arial
+
+title Clareo — Diagrama de Casos de Uso: Instituição
+
+actor "Instituição" as Institution
+actor "Admin" as Admin
+actor "Asaas\n(PSP)" as Asaas
+
+rectangle "Sistema Clareo" {
+  usecase "Cadastrar Conta" as UC1
+  usecase "Fazer Login" as UC2
+  usecase "Esqueci a Senha" as UC3
+  usecase "Editar Perfil" as UC4
+  usecase "Ver Doações Recebidas" as UC5
+  usecase "Ver Detalhes Split" as UC6
+  usecase "Ver Extrato" as UC7
+  usecase "Ver Status Pagamento" as UC8
+  usecase "Cadastrar Instituição\n(Admin)" as UC9
+  usecase "Aprovar Instituição\n(Admin)" as UC10
+  usecase "Solicitar Saque" as UC11
+}
+
+rectangle "Asaas (PSP)" {
+  usecase "Receber Split\nAutomaticamente" as UC_A1
+  usecase "Transferir PIX" as UC_A2
+}
+
+Institution --> UC1
+Institution --> UC2
+Institution --> UC3
+Institution --> UC4
+Institution --> UC5
+Institution --> UC6
+Institution --> UC7
+Institution --> UC8
+Institution --> UC11
+
+Admin --> UC9
+Admin --> UC10
+
+UC_A1 --> UC5 : notifica
+UC11 ..> UC_A2 : include
+
+note right of UC5
+  Instituição vê todas
+  as doações que
+  recebeu via split.
+end note
+
+note bottom of UC_A1
+  Split é creditado
+  automaticamente
+  na subconta Asaas
+  da instituição.
+end note
+
+@enduml
