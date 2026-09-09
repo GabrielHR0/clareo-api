@@ -1,86 +1,88 @@
 @startuml Clareo - Integracao Asaas
 !theme plain
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Integração Asaas
 
+left to right direction
+
+' ===== Atores =====
 actor "Doador" as Donor
 actor "Instituição" as Institution
 actor "Admin" as Admin
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Criar Subconta\nInstituição" as UC1
-  usecase "Criar Cobrança\ncom Split" as UC2
-  usecase "Gerar PIX\nDinâmico" as UC3
-  usecase "Receber Webhook\nPagamento" as UC4
-  usecase "Receber Webhook\nSplit" as UC5
-  usecase "Registrar Doação" as UC6
-  usecase "Atualizar Status\nSplit" as UC7
-  usecase "Notificar\nInstituição" as UC8
-  usecase "Consultar Status\nPagamento" as UC9
-  usecase "Criar Assinatura\nPro" as UC10
-  usecase "Receber Webhook\nAssinatura" as UC11
-  usecase "Atualizar\nSubscription" as UC12
+
+  package "Cobrança" {
+    usecase "Criar Cobrança com Split" as UC1
+    usecase "Gerar PIX Dinâmico" as UC2
+    usecase "Consultar Status Pagamento" as UC3
+  }
+
+  package "Split" {
+    usecase "Registrar Doação" as UC4
+    usecase "Atualizar Status Split" as UC5
+    usecase "Notificar Instituição" as UC6
+  }
+
+  package "Assinatura" {
+    usecase "Criar Assinatura Pro" as UC7
+    usecase "Atualizar Subscription" as UC8
+  }
+
+  package "Webhooks" {
+    usecase "Receber Webhook\nPAYMENT_RECEIVED" as UC9
+    usecase "Receber Webhook\nPAYMENT_SPLIT_DONE" as UC10
+    usecase "Receber Webhook\nSUBSCRIPTION_CREATED" as UC11
+  }
+
+  package "Subcontas" {
+    usecase "Criar Subconta\nInstituição" as UC12
+  }
 }
 
+' ===== Asaas =====
 rectangle "Asaas API" {
-  usecase "POST /subaccounts" as UC_A1
-  usecase "POST /payments\ncom splits" as UC_A2
-  usecase "PIX Dinâmico\nQR Code" as UC_A3
-  usecase "Split Automático" as UC_A4
-  usecase "Webhook\nPAYMENT_RECEIVED" as UC_A5
-  usecase "Webhook\nPAYMENT_SPLIT_DONE" as UC_A6
-  usecase "GET /payments/{id}" as UC_A7
-  usecase "POST /subscriptions" as UC_A8
-  usecase "Webhook\nSUBSCRIPTION_CREATED" as UC_A9
+  usecase "POST /payments" as UC_A1
+  usecase "PIX Dinâmico" as UC_A2
+  usecase "Split Automático" as UC_A3
+  usecase "POST /subaccounts" as UC_A4
+  usecase "POST /subscriptions" as UC_A5
+  usecase "GET /payments/{id}" as UC_A6
 }
 
-rectangle "Banco Central\n(PIX)" {
-  usecase "Transferência\nInstantânea" as UC_B1
+' ===== Banco Central =====
+rectangle "Banco Central (PIX)" {
+  usecase "Transferência Instantânea" as UC_B1
 }
 
-Admin --> UC1
+' ===== Conexões =====
+Admin --> UC12
+Donor --> UC1
 Donor --> UC2
-Donor --> UC3
-Institution --> UC9
-Institution --> UC10
+Institution --> UC3
+Institution --> UC7
 
-UC1 ..> UC_A1 : include
-UC2 ..> UC_A2 : include
-UC3 ..> UC_A3 : include
-UC_A2 ..> UC_A4 : include
-UC4 ..> UC_A5 : receive
-UC5 ..> UC_A6 : receive
-UC6 ..> UC4 : processa
-UC7 ..> UC5 : processa
-UC8 ..> UC7 : after
-UC_A4 ..> UC_B1 : executa
-UC9 ..> UC_A7 : consulta
-UC10 ..> UC_A8 : include
-UC11 ..> UC_A9 : receive
-UC12 ..> UC11 : processa
+' ===== Relacionamentos =====
+UC1 ..> UC_A1 : <<include>>
+UC2 ..> UC_A2 : <<include>>
+UC_A1 ..> UC_A3 : executa
+UC12 ..> UC_A4 : <<include>>
+UC7 ..> UC_A5 : <<include>>
+UC3 ..> UC_A6 : consulta
 
-note top of UC_A4
-  Asaas divide
-  automaticamente
-  o valor entre
-  as instituições.
-end note
-
-note right of UC_B1
-  PIX é instantâneo.
-  Instituição recebe
-  na hora.
-end note
-
-note bottom of UC_A9
-  Webhook confirma
-  criação da
-  assinatura Pro.
-end note
+UC9 --> UC4 : processa
+UC10 --> UC5 : processa
+UC11 --> UC8 : processa
+UC5 ..> UC6 : after
+UC_A3 ..> UC_B1 : executa
 
 @enduml

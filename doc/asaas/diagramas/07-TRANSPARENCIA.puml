@@ -1,39 +1,47 @@
 @startuml Clareo - Transparencia
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Transparência
 
+left to right direction
+
+' ===== Atores =====
 actor "Instituição" as Institution
 actor "Doador" as Donor
 actor "Visitante" as Visitor
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Criar Post" as UC1
-  usecase "Editar Post" as UC2
-  usecase "Excluir Post" as UC3
-  usecase "Upload Comprovante" as UC4
-  usecase "Ver Feed\nTransparência" as UC5
-  usecase "Ver Detalhes\nPost" as UC6
-  usecase "Ver Posts\npor Instituição" as UC7
-  usecase "Filtrar por Tipo" as UC8
+
+  package "Gerenciar Posts (Pro)" {
+    usecase "Criar Post" as UC1
+    usecase "Editar Post" as UC2
+    usecase "Excluir Post" as UC3
+    usecase "Upload Comprovante" as UC4
+  }
+
+  package "Feed Público" {
+    usecase "Ver Feed" as UC5
+    usecase "Ver Detalhes Post" as UC6
+    usecase "Ver Posts por Instituição" as UC7
+    usecase "Filtrar por Tipo" as UC8
+  }
 }
 
-rectangle "Feed Público" {
-  usecase "Listar Atualizações" as UC_F1
-  usecase "Listar Comprovantes" as UC_F2
-  usecase "Listar Relatórios" as UC_F3
-}
-
+' ===== Storage =====
 rectangle "Storage" {
-  usecase "Armazenar\nArquivos" as UC_S1
+  usecase "Armazenar Arquivos" as UC_S1
 }
 
+' ===== Conexões =====
 Institution --> UC1
 Institution --> UC2
 Institution --> UC3
@@ -48,32 +56,9 @@ Donor --> UC5
 Donor --> UC6
 Donor --> UC7
 
-UC_F1 --> UC1
-UC_F2 --> UC4
-UC5 ..> UC_F1 : inclui
-UC5 ..> UC_F2 : inclui
-UC5 ..> UC_F3 : inclui
+' ===== Relacionamentos =====
 UC4 ..> UC_S1 : envia
-
-note right of UC1
-  Post é público.
-  Qualquer um vê.
-  Tipos: update,
-  receipt, report.
-end note
-
-note bottom of UC5
-  Feed cronológico
-  com posts de todas
-  as instituições.
-  Inclui attachments.
-end note
-
-note right of UC4
-  Upload de PDF,
-  imagem ou documento
-  como comprovante
-  de uso do dinheiro.
-end note
+UC5 ..> UC1 : inclui
+UC5 ..> UC4 : inclui
 
 @enduml

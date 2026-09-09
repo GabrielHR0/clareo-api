@@ -1,67 +1,79 @@
 @startuml Clareo - Doador
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Doador
 
+left to right direction
+
+' ===== Atores =====
 actor "Doador" as Donor
+actor "Asaas" as Asaas
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Cadastrar Conta" as UC1
-  usecase "Fazer Login" as UC2
-  usecase "Esqueci a Senha" as UC3
-  usecase "Listar Instituições" as UC4
-  usecase "Selecionar Instituição" as UC5
-  usecase "Definir Valor Doação" as UC6
-  usecase "Gerar QR Code PIX" as UC7
-  usecase "Pagar via PIX" as UC8
-  usecase "Ver Status Doação" as UC9
-  usecase "Ver Histórico Doações" as UC10
-  usecase "Receber Confirmação" as UC11
-  usecase "Cancelar Doação" as UC12
-  usecase "Editar Perfil" as UC13
+
+  package "Conta" {
+    usecase "Cadastrar Conta" as UC1
+    usecase "Fazer Login" as UC2
+    usecase "Esqueci a Senha" as UC3
+    usecase "Editar Perfil" as UC4
+  }
+
+  package "Explorar" {
+    usecase "Listar Instituições" as UC5
+    usecase "Selecionar Instituição" as UC6
+    usecase "Ver Campanhas Ativas" as UC7
+    usecase "Ver Feed Transparência" as UC8
+  }
+
+  package "Doar" {
+    usecase "Definir Valor" as UC9
+    usecase "Gerar QR Code PIX" as UC10
+    usecase "Pagar via PIX" as UC11
+    usecase "Cancelar Doação" as UC12
+  }
+
+  package "Acompanhar" {
+    usecase "Ver Status da Doação" as UC13
+    usecase "Receber Confirmação" as UC14
+    usecase "Ver Histórico de Doações" as UC15
+  }
 }
 
+' ===== Asaas =====
 rectangle "Asaas (PSP)" {
-  usecase "Criar Cobrança\ncom Split" as UC_A1
-  usecase "Gerar PIX\nDinâmico" as UC_A2
+  usecase "Criar Cobrança com Split" as UC_A1
+  usecase "Gerar PIX Dinâmico" as UC_A2
 }
 
+' ===== Conexões =====
 Donor --> UC1
 Donor --> UC2
 Donor --> UC3
 Donor --> UC4
 Donor --> UC5
 Donor --> UC6
+Donor --> UC7
 Donor --> UC8
 Donor --> UC9
-Donor --> UC10
+Donor --> UC11
 Donor --> UC13
+Donor --> UC15
 
-UC2 ..> UC1 : include
-UC7 ..> UC6 : include
-UC7 ..> UC_A1 : include
-UC_A1 ..> UC_A2 : include
-UC8 ..> UC7 : include
-UC11 ..> UC9 : extends
-UC12 ..> UC9 : extends
-
-note right of UC8
-  O doador paga via
-  PIX usando o QR
-  Code gerado pelo
-  Asaas.
-end note
-
-note bottom of UC_A1
-  Split automático:
-  valor é dividido
-  entre instituições.
-end note
+' ===== Relacionamentos =====
+UC6 ..> UC9 : lead para
+UC10 ..> UC_A1 : <<include>>
+UC_A1 ..> UC_A2 : <<include>>
+UC11 ..> UC10 : utiliza
+UC14 ..> UC13 : opcional
+UC12 ..> UC13 : extends
 
 @enduml

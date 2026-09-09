@@ -1,78 +1,77 @@
 @startuml Clareo - Relatorios
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Relatórios
 
+left to right direction
+
+' ===== Atores =====
 actor "Instituição" as Institution
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Gerar Relatório\nPDF" as UC1
-  usecase "Gerar Relatório\nCSV" as UC2
-  usecase "Definir Período" as UC3
-  usecase "Ver Resumo\nFinanceiro" as UC4
-  usecase "Ver Total\nDoações" as UC5
-  usecase "Ver Média\nDoação" as UC6
-  usecase "Ver Top Doadores" as UC7
-  usecase "Ver Evolução\nMensal" as UC8
-  usecase "Baixar Relatório" as UC9
-  usecase "Listar Relatórios\nAnteriores" as UC10
+
+  package "Gerar Relatório (Pro)" {
+    usecase "Definir Período" as UC1
+    usecase "Selecionar Formato" as UC2
+    usecase "Gerar Relatório PDF" as UC3
+    usecase "Gerar Relatório CSV" as UC4
+    usecase "Baixar Relatório" as UC5
+  }
+
+  package "Dashboard (Pro)" {
+    usecase "Ver Resumo Financeiro" as UC6
+    usecase "Ver Total Doações" as UC7
+    usecase "Ver Média por Doação" as UC8
+    usecase "Ver Top Doadores" as UC9
+    usecase "Ver Evolução Mensal" as UC10
+  }
+
+  package "Histórico" {
+    usecase "Listar Relatórios Anteriores" as UC11
+  }
 }
 
-rectangle "Gerador de Relatórios" {
+' ===== Gerador =====
+rectangle "Motor de Relatórios" {
   usecase "Calcular Totais" as UC_G1
   usecase "Calcular Média" as UC_G2
   usecase "Gerar Gráfico" as UC_G3
-  usecase "Gerar Arquivo" as UC_G4
+  usecase "Montar Arquivo" as UC_G4
 }
 
+' ===== Storage =====
 rectangle "Storage" {
-  usecase "Armazenar\nRelatório" as UC_S1
+  usecase "Armazenar Relatório" as UC_S1
 }
 
+' ===== Conexões =====
 Institution --> UC1
 Institution --> UC2
 Institution --> UC3
 Institution --> UC4
-Institution --> UC9
-Institution --> UC10
+Institution --> UC5
+Institution --> UC6
+Institution --> UC11
 
-UC1 ..> UC_G1 : include
-UC1 ..> UC_G2 : include
-UC1 ..> UC_G4 : include
-UC2 ..> UC_G4 : include
-UC4 ..> UC5 : inclui
-UC4 ..> UC6 : inclui
-UC4 ..> UC7 : inclui
-UC4 ..> UC8 : inclui
+' ===== Relacionamentos =====
+UC3 ..> UC_G1 : <<include>>
+UC3 ..> UC_G2 : <<include>>
+UC4 ..> UC_G4 : <<include>>
+UC3 ..> UC_G4 : <<include>>
 UC_G4 ..> UC_S1 : salva
-UC9 ..> UC_S1 : baixa
-
-note right of UC1
-  Requer assinatura
-  Pro. Gera PDF
-  com gráficos e
-  tabelas.
-end note
-
-note bottom of UC4
-  Dashboard com:
-  - Total de doações
-  - Valor total recebido
-  - Média por doação
-  - Top 10 doadores
-  - Evolução mensal
-end note
-
-note right of UC7
-  Lista os maiores
-  doadores (sem
-  dados sensíveis).
-end note
+UC5 ..> UC_S1 : baixa
+UC6 ..> UC7 : inclui
+UC6 ..> UC8 : inclui
+UC6 ..> UC9 : inclui
+UC6 ..> UC10 : inclui
 
 @enduml

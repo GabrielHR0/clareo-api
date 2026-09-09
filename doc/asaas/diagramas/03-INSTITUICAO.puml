@@ -1,54 +1,83 @@
 @startuml Clareo - Instituicao
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Instituição
 
+left to right direction
+
+' ===== Atores =====
 actor "Instituição" as Institution
-actor "Admin" as Admin
-actor "Asaas\n(PSP)" as Asaas
+actor "Asaas" as Asaas
 
-rectangle "Sistema Clareo — Tier Gratuito" {
-  usecase "Cadastrar Conta" as UC1
-  usecase "Fazer Login" as UC2
-  usecase "Esqueci a Senha" as UC3
-  usecase "Ver Doações Recebidas" as UC4
-  usecase "Ver Extrato Básico" as UC5
-  usecase "Solicitar Saque" as UC6
-  usecase "Editar Perfil" as UC7
+' ===== Sistema =====
+rectangle "Sistema Clareo" {
+
+  package "Conta" {
+    usecase "Cadastrar Conta" as UC1
+    usecase "Fazer Login" as UC2
+    usecase "Esqueci a Senha" as UC3
+    usecase "Editar Perfil" as UC4
+  }
+
+  package "Tier Gratuito" {
+    usecase "Ver Doações Recebidas" as UC5
+    usecase "Ver Extrato Básico" as UC6
+    usecase "Solicitar Saque" as UC7
+  }
+
+  package "Campanhas (Pro)" {
+    usecase "Criar Campanha" as UC8
+    usecase "Editar Campanha" as UC9
+    usecase "Pausar Campanha" as UC10
+    usecase "Encerrar Campanha" as UC11
+  }
+
+  package "Transparência (Pro)" {
+    usecase "Postar Atualização" as UC12
+    usecase "Upload Comprovante" as UC13
+    usecase "Gerenciar Posts" as UC14
+  }
+
+  package "Relatórios (Pro)" {
+    usecase "Gerar Relatório PDF" as UC15
+    usecase "Gerar Relatório CSV" as UC16
+    usecase "Ver Resumo Financeiro" as UC17
+  }
+
+  package "Financeiro (Pro)" {
+    usecase "Ver Saldo Detalhado" as UC18
+    usecase "Ver Histórico Transações" as UC19
+  }
+
+  package "Assinatura" {
+    usecase "Ver Plano Atual" as UC20
+    usecase "Fazer Upgrade para Pro" as UC21
+    usecase "Cancelar Assinatura" as UC22
+    usecase "Ver Faturas" as UC23
+  }
 }
 
-rectangle "Sistema Clareo — Tier Pro (Pago)" {
-  usecase "Criar Campanha" as UC8
-  usecase "Editar Campanha" as UC9
-  usecase "Pausar Campanha" as UC10
-  usecase "Encerrar Campanha" as UC11
-  usecase "Postar Atualização" as UC12
-  usecase "Upload Comprovante" as UC13
-  usecase "Gerar Relatório PDF" as UC14
-  usecase "Gerar Relatório CSV" as UC15
-  usecase "Ver Saldo Detalhado" as UC16
-  usecase "Ver Histórico\nTransações" as UC17
-  usecase "Gerenciar Assinatura" as UC18
-  usecase "Fazer Upgrade" as UC19
-  usecase "Cancelar Assinatura" as UC20
-}
-
+' ===== Asaas =====
 rectangle "Asaas (PSP)" {
-  usecase "Receber Split\nAutomaticamente" as UC_A1
+  usecase "Receber Split" as UC_A1
   usecase "Transferir PIX" as UC_A2
   usecase "Criar Assinatura" as UC_A3
 }
 
+' ===== Feed Público =====
 rectangle "Feed Público" {
-  usecase "Ver Feed\nTransparência" as UC_F1
+  usecase "Visualizar Feed" as UC_F1
 }
 
+' ===== Conexões =====
 Institution --> UC1
 Institution --> UC2
 Institution --> UC3
@@ -56,7 +85,6 @@ Institution --> UC4
 Institution --> UC5
 Institution --> UC6
 Institution --> UC7
-
 Institution --> UC8
 Institution --> UC9
 Institution --> UC10
@@ -70,22 +98,14 @@ Institution --> UC17
 Institution --> UC18
 Institution --> UC19
 Institution --> UC20
+Institution --> UC21
+Institution --> UC22
+Institution --> UC23
 
+' ===== Relacionamentos =====
 UC_F1 --> UC12 : visualiza
-UC_A1 --> UC4 : notifica
-UC6 ..> UC_A2 : include
-UC19 ..> UC_A3 : include
-
-note bottom of UC_F1
-  Feed público.
-  Visitantes e doadores
-  veem as atualizações
-  da instituição.
-end note
-
-note right of UC8
-  Requer assinatura
-  Pro ativa.
-end note
+UC_A1 --> UC5 : notifica
+UC7 ..> UC_A2 : <<include>>
+UC21 ..> UC_A3 : <<include>>
 
 @enduml

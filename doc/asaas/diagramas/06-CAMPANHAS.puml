@@ -1,73 +1,75 @@
 @startuml Clareo - Campanhas
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Campanhas
 
+left to right direction
+
+' ===== Atores =====
 actor "Instituição" as Institution
 actor "Doador" as Donor
 actor "Visitante" as Visitor
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Criar Campanha" as UC1
-  usecase "Editar Campanha" as UC2
-  usecase "Pausar Campanha" as UC3
-  usecase "Retomar Campanha" as UC4
-  usecase "Encerrar Campanha" as UC5
-  usecase "Ver Campanhas\nAtivas" as UC6
-  usecase "Ver Detalhes\nCampanha" as UC7
-  usecase "Ver Progresso" as UC8
-  usecase "Doar para\nCampanha" as UC9
-  usecase "Ver Estatísticas" as UC10
+
+  package "Gerenciar Campanha (Pro)" {
+    usecase "Criar Campanha" as UC1
+    usecase "Editar Campanha" as UC2
+    usecase "Pausar Campanha" as UC3
+    usecase "Retomar Campanha" as UC4
+    usecase "Encerrar Campanha" as UC5
+    usecase "Ver Estatísticas" as UC6
+  }
+
+  package "Explorar Campanhas" {
+    usecase "Ver Campanhas Ativas" as UC7
+    usecase "Ver Detalhes Campanha" as UC8
+    usecase "Ver Progresso" as UC9
+    usecase "Buscar por Categoria" as UC10
+  }
+
+  package "Doar para Campanha" {
+    usecase "Definir Valor" as UC11
+    usecase "Doar via PIX" as UC12
+  }
 }
 
+' ===== Asaas =====
 rectangle "Asaas (PSP)" {
-  usecase "Criar Cobrança\ncom Split" as UC_A1
+  usecase "Criar Cobrança com Split" as UC_A1
 }
 
+' ===== Conexões =====
 Institution --> UC1
 Institution --> UC2
 Institution --> UC3
 Institution --> UC4
 Institution --> UC5
-Institution --> UC10
+Institution --> UC6
 
-Visitor --> UC6
 Visitor --> UC7
 Visitor --> UC8
+Visitor --> UC9
+Visitor --> UC10
 
-Donor --> UC6
 Donor --> UC7
+Donor --> UC8
 Donor --> UC9
+Donor --> UC11
+Donor --> UC12
 
-UC9 ..> UC_A1 : include
-UC1 ..> UC8 : include
-UC10 ..> UC8 : include
-
-note right of UC1
-  Requer assinatura
-  Pro ativa.
-  Define título,
-  descrição, valor
-  meta, prazo.
-end note
-
-note bottom of UC6
-  Feed público com
-  todas as campanhas
-  ativas e pausadas.
-end note
-
-note right of UC8
-  Mostra progresso:
-  current_amount /
-  goal_amount
-  em tempo real.
-end note
+' ===== Relacionamentos =====
+UC12 ..> UC_A1 : <<include>>
+UC1 ..> UC9 : inclui
+UC6 ..> UC9 : utiliza
 
 @enduml

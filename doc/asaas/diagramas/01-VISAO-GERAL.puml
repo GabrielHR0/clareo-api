@@ -1,77 +1,117 @@
 @startuml Clareo - Visao Geral
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso (Visão Geral)
 
+left to right direction
+
+' ===== Atores =====
 actor "Visitante" as Visitor
 actor "Doador" as Donor
 actor "Instituição" as Institution
 actor "Admin" as Admin
-actor "Asaas\n(PSP)" as Asaas
+actor "Asaas" as Asaas
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Cadastrar Conta" as UC1
-  usecase "Fazer Login" as UC2
-  usecase "Ver Campanhas" as UC3
-  usecase "Ver Feed\nTransparência" as UC4
-  usecase "Doar via PIX" as UC5
-  usecase "Ver Doações" as UC6
-  usecase "Criar Campanha" as UC7
-  usecase "Postar Atualização" as UC8
-  usecase "Gerar Relatório" as UC9
-  usecase "Ver Saldo" as UC10
-  usecase "Gerenciar Instituições" as UC11
-  usecase "Gerenciar Usuários" as UC12
-  usecase "Ver Relatórios\nAdmin" as UC13
-  usecase "Criar Subconta" as UC14
-  usecase "Criar Cobrança\ncom Split" as UC15
-  usecase "Processar Webhook" as UC16
-  usecase "Gerenciar\nAssinatura" as UC17
+
+  package "Autenticação" {
+    usecase "Cadastrar Conta" as UC1
+    usecase "Fazer Login" as UC2
+  }
+
+  package "Doação" {
+    usecase "Doar via PIX" as UC3
+    usecase "Ver Doações" as UC4
+    usecase "Ver Status da Doação" as UC5
+  }
+
+  package "Campanhas (Pro)" {
+    usecase "Criar Campanha" as UC6
+    usecase "Ver Campanhas" as UC7
+    usecase "Gerenciar Campanha" as UC8
+  }
+
+  package "Transparência" {
+    usecase "Postar Atualização" as UC9
+    usecase "Ver Feed" as UC10
+    usecase "Upload Comprovante" as UC11
+  }
+
+  package "Relatórios (Pro)" {
+    usecase "Gerar Relatório" as UC12
+    usecase "Baixar Relatório" as UC13
+  }
+
+  package "Financeiro (Pro)" {
+    usecase "Ver Saldo" as UC14
+    usecase "Ver Extrato" as UC15
+  }
+
+  package "Assinatura" {
+    usecase "Gerenciar Plano" as UC16
+    usecase "Fazer Upgrade" as UC17
+  }
+
+  package "Administração" {
+    usecase "Gerenciar Instituições" as UC18
+    usecase "Gerenciar Usuários" as UC19
+    usecase "Ver Relatórios Admin" as UC20
+  }
+
+  package "Integração Asaas" {
+    usecase "Criar Subconta" as UC21
+    usecase "Criar Cobrança\ncom Split" as UC22
+    usecase "Processar Webhook" as UC23
+  }
 }
 
-Visitor --> UC3
-Visitor --> UC4
+' ===== Visitante =====
+Visitor --> UC7
+Visitor --> UC10
 
+' ===== Doador =====
 Donor --> UC1
 Donor --> UC2
+Donor --> UC3
+Donor --> UC4
 Donor --> UC5
-Donor --> UC6
 
-Institution --> UC1
+' ===== Instituição =====
 Institution --> UC2
+Institution --> UC4
 Institution --> UC6
-Institution --> UC7
 Institution --> UC8
 Institution --> UC9
-Institution --> UC10
+Institution --> UC11
+Institution --> UC12
+Institution --> UC13
+Institution --> UC14
+Institution --> UC15
+Institution --> UC16
 Institution --> UC17
 
+' ===== Admin =====
 Admin --> UC2
-Admin --> UC11
-Admin --> UC12
-Admin --> UC13
+Admin --> UC18
+Admin --> UC19
+Admin --> UC20
 
-Asaas --> UC14
-Asaas --> UC16
+' ===== Asaas =====
+Asaas --> UC21
+Asaas --> UC23
 
-UC5 ..> UC15 : include
-UC15 ..> UC14 : include
-UC16 ..> UC6 : include
-
-note right of UC7
-  Requer assinatura
-  Pro (paga).
-end note
-
-note bottom of UC8
-  Feed público.
-  Qualquer um vê.
-end note
+' ===== Relacionamentos =====
+UC3 ..> UC22 : <<include>>
+UC22 ..> UC21 : <<include>>
+UC23 ..> UC4 : notifica
 
 @enduml

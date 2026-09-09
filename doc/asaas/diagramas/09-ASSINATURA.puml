@@ -1,73 +1,70 @@
 @startuml Clareo - Assinatura
 !theme plain
-left to right direction
-skinparam actorStyle awesome
-skinparam packageStyle rectangle
-skinparam packageFontSize 14
-skinparam usecaseFontSize 12
 skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Assinatura
 
+left to right direction
+
+' ===== Atores =====
 actor "Instituição" as Institution
-actor "Asaas\n(PSP)" as Asaas
+actor "Asaas" as Asaas
 
+' ===== Sistema =====
 rectangle "Sistema Clareo" {
-  usecase "Ver Plano Atual" as UC1
-  usecase "Ver Funcionalidades\nDisponíveis" as UC2
-  usecase "Fazer Upgrade\npara Pro" as UC3
-  usecase "Cancelar\nAssinatura" as UC4
-  usecase "Ver Faturas" as UC5
-  usecase "Ver Status\nAssinatura" as UC6
-  usecase "Reativar\nAssinatura" as UC7
+
+  package "Gerenciar Plano" {
+    usecase "Ver Plano Atual" as UC1
+    usecase "Ver Funcionalidades\nDisponíveis" as UC2
+    usecase "Ver Faturas" as UC3
+    usecase "Ver Status Assinatura" as UC4
+  }
+
+  package "Upgrade" {
+    usecase "Fazer Upgrade para Pro" as UC5
+    usecase "Confirmar Pagamento" as UC6
+    usecase "Ativar Funcionalidades Pro" as UC7
+  }
+
+  package "Cancelamento" {
+    usecase "Cancelar Assinatura" as UC8
+    usecase "Desativar Funcionalidades Pro" as UC9
+    usecase "Reativar Assinatura" as UC10
+  }
 }
 
+' ===== Asaas =====
 rectangle "Asaas (PSP)" {
-  usecase "Criar Assinatura\nRecorrente" as UC_A1
-  usecase "Gerar Boleto\nPIX Mensal" as UC_A2
-  usecase "Webhook\nSUBSCRIPTION" as UC_A3
-  usecase "Cancelar\nAssinatura Asaas" as UC_A4
+  usecase "Criar Assinatura Recorrente" as UC_A1
+  usecase "Gerar Cobrança Mensal" as UC_A2
+  usecase "Cancelar Assinatura Asaas" as UC_A3
+  usecase "Webhook SUBSCRIPTION" as UC_A4
 }
 
+' ===== Conexões =====
 Institution --> UC1
 Institution --> UC2
 Institution --> UC3
 Institution --> UC4
 Institution --> UC5
-Institution --> UC6
-Institution --> UC7
+Institution --> UC8
+Institution --> UC10
 
-UC3 ..> UC_A1 : include
-UC3 ..> UC_A2 : include
-UC_A3 --> UC6 : atualiza
-UC4 ..> UC_A4 : include
-UC7 ..> UC_A1 : recria
-
-note right of UC1
-  Plano gratuito:
-  Receber splits,
-  ver doações.
-
-  Plano Pro:
-  + Campanhas
-  + Transparência
-  + Relatórios
-  + Saldo
-end note
-
-note bottom of UC_A1
-  Assinatura recorrente
-  mensal. Asaas gera
-  cobrança automatica
-  todo mês.
-end note
-
-note right of UC5
-  Lista todas as
-  faturas pagas
-  e pendentes.
-  Inclui link
-  para pagamento.
-end note
+' ===== Relacionamentos =====
+UC5 ..> UC_A1 : <<include>>
+UC5 ..> UC_A2 : <<include>>
+UC_A4 --> UC4 : atualiza
+UC8 ..> UC_A3 : <<include>>
+UC10 ..> UC_A1 : recria
+UC6 ..> UC_A4 : via webhook
+UC7 ..> UC6 : after
+UC9 ..> UC8 : after
 
 @enduml
