@@ -4,64 +4,33 @@ skinparam defaultFontName Arial
 skinparam defaultFontSize 11
 skinparam nodeFontSize 12
 skinparam componentFontSize 11
+skinparam databaseFontSize 12
 skinparam titleFontSize 16
 skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Implantação (Detalhado)
 
 node "Dispositivo do Usuário" as Device {
-  component "Navegador Web" as Browser {
-    [Frontend React/Vue]
-  }
+  component "Navegador Web" as Browser
   component "App Bancário" as BankApp
 }
 
-node "Servidor Clareo (AWS/Heroku)" as ClareoServer {
-
-  node "Container Docker" as Docker {
-    component "Rails API (Puma)" as Puma {
-      [AuthController]
-      [DonationsController]
-      [CampaignsController]
-      [PostsController]
-      [ReportsController]
-      [SubscriptionController]
-      [WebhooksController]
-    }
-
-    component "Background Jobs" as Jobs {
-      [Sidekiq Worker]
-      [DonationJob]
-      [ReportJob]
-      [WebhookJob]
-    }
-  }
-
-  node "Redis" as RedisNode {
-    component "Cache" as Cache
-    component "Queue" as Queue
-  }
+node "Servidor Clareo" as ClareoServer {
+  component "Rails API\n(Puma)" as Puma
+  component "Sidekiq\n(Jobs)" as Jobs
+  component "Redis\n(Cache/Queue)" as Redis
 }
 
-node "Banco de Dados (AWS RDS)" as DBNode {
-  database "PostgreSQL 15" as PG {
-    table "users" as T1
-    table "institutions" as T2
-    table "donations" as T3
-    table "donation_splits" as T4
-    table "campaigns" as T5
-    table "posts" as T6
-    table "subscriptions" as T7
-    table "donation_reports" as T8
-  }
+node "Banco de Dados" as DBNode {
+  database "PostgreSQL 15" as PG
 }
 
-node "Storage (AWS S3)" as S3Node {
-  bucket "clareo-uploads" as S3Bucket {
-    folder "attachments/" as F1
-    folder "reports/" as F2
-    folder "campaigns/" as F3
-  }
+node "Storage" as S3Node {
+  component "AWS S3" as S3
+}
+
+node "CDN" as CDNNode {
+  component "CloudFront" as CDN
 }
 
 node "Asaas (PSP)" as AsaasNode {
@@ -70,31 +39,27 @@ node "Asaas (PSP)" as AsaasNode {
   component "PIX Engine" as PIX
 }
 
-node "Banco Central (SPI)" as BCBNode {
-  component "PIX Instantâneo" as PIXSPI
+node "Banco Central" as BCBNode {
+  component "SPI (PIX)" as SPI
 }
-
-cloud "CDN (CloudFront)" as CDN
-
-' ===== Conexões =====
 
 Browser --> CDN : HTTPS
 CDN --> Puma : HTTPS
 
-BankApp --> PIX : App bancário
+BankApp --> SPI : PIX
 
-Puma --> PG : SQL (5432)
-Puma --> RedisNode : Redis (6379)
+Puma --> PG : SQL
+Puma --> Redis : TCP 6379
 Puma --> AsaasAPI : HTTPS
-Puma --> S3Bucket : HTTPS
+Puma --> S3 : HTTPS
 
-Jobs --> Queue : consome
+Jobs --> Redis : consome fila
 Jobs --> PG : SQL
 Jobs --> AsaasAPI : HTTPS
 
-AsaasWH --> Puma : Webhook HTTPS
+AsaasWH --> Puma : Webhook
 
-AsaasAPI --> PIX : Interno
-PIX --> PIXSPI : SPI
+AsaasAPI --> PIX : interno
+PIX --> SPI : SPI
 
 @enduml
