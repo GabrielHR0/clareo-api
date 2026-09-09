@@ -11,61 +11,57 @@ skinparam titleFontStyle bold
 
 title Clareo — Diagrama de Casos de Uso: Integração Asaas
 
-left to right direction
-
 ' ===== Atores =====
 actor "Doador" as Donor
 actor "Instituição" as Institution
 actor "Admin" as Admin
 actor "Asaas" as Asaas
 
-' ===== Sistema =====
-rectangle "Sistema Clareo" {
+' ===== Fluxo de Cobrança =====
+rectangle "Sistema Clareo" as Clareo {
 
-  package "Cobrança" {
+  package "Envio (Doador → Clareo)" {
     usecase "Criar Cobrança com Split" as UC1
     usecase "Gerar PIX Dinâmico" as UC2
-    usecase "Consultar Status" as UC3
   }
 
-  package "Split" {
-    usecase "Registrar Doação" as UC4
-    usecase "Atualizar Status Split" as UC5
+  package "Processamento (Asaas)" {
+    usecase "Split Automático" as UC3
+    usecase "Transferir PIX" as UC4
+  }
+
+  package "Recebimento (Instituição)" {
+    usecase "Registrar Doação" as UC5
     usecase "Notificar Instituição" as UC6
   }
 
-  package "Assinatura" {
-    usecase "Criar Assinatura Pro" as UC7
-    usecase "Atualizar Subscription" as UC8
-  }
-
-  package "Webhooks" {
-    usecase "Receber Webhook" as UC9
-  }
-
   package "Subcontas" {
-    usecase "Criar Subconta" as UC10
+    usecase "Criar Subconta" as UC7
+  }
+
+  package "Assinatura" {
+    usecase "Criar Assinatura Pro" as UC8
   }
 }
 
-' ===== Conexões =====
-Admin --> UC10
+' ===== Fluxo Linear =====
 Donor --> UC1
-Donor --> UC2
-Institution --> UC3
-Institution --> UC7
+UC1 --> UC2
+UC2 --> Asaas
+Asaas --> UC3
+UC3 --> UC4
+UC4 --> Institution
 
-Asaas --> UC9
+' ===== Webhook =====
+Asaas --> UC5 : webhook
+UC5 --> UC6
 
-' ===== Relacionamentos =====
-UC1 ..> Asaas : envia pagamento
-UC2 ..> Asaas : gera QR
-UC10 ..> Asaas : cria subconta
-UC7 ..> Asaas : cria assinatura
-UC9 ..> UC4 : processa
-UC9 ..> UC5 : processa
-UC9 ..> UC8 : processa
-UC5 ..> UC6 : after
-UC3 ..> Asaas : consulta
+' ===== Admin =====
+Admin --> UC7
+UC7 --> Asaas : cria subconta
+
+' ===== Assinatura =====
+Institution --> UC8
+UC8 --> Asaas : cria assinatura
 
 @enduml
