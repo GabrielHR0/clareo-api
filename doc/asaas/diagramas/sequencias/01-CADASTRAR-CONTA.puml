@@ -1,0 +1,46 @@
+@startuml Sequencia - Cadastrar Conta
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Cadastrar Conta
+
+actor "Usuário" as User
+participant "Frontend" as Front
+participant "AuthController" as Auth
+participant "UserService" as Service
+database "PostgreSQL" as DB
+
+== Caso de Uso: Cadastrar Conta ==
+
+User -> Front : Preenche formulário\n(name, email, password, role)
+activate Front
+
+Front -> Auth : POST /api/v1/auth/register\n{name, email, password, role}
+activate Auth
+
+Auth -> Service : create(params)
+activate Service
+
+Service -> DB : INSERT INTO users\n(name, email, password_digest, role)
+activate DB
+DB --> Service : user created
+deactivate DB
+
+Service --> Auth : user
+deactivate Service
+
+Auth -> Auth : generate JWT(user_id)
+
+Auth --> Front : 201 Created\n{token, user}
+deactivate Auth
+
+Front --> User : Exibe mensagem\n"Conta criada com sucesso"
+deactivate Front
+
+@enduml

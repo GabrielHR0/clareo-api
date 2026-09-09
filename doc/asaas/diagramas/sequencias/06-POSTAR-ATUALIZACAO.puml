@@ -1,0 +1,83 @@
+@startuml Sequencia - Postar Atualizacao
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Postar Atualização (Transparência)
+
+actor "Instituição" as Institution
+participant "Frontend" as Front
+participant "PostsController" as Controller
+participant "PostService" as Service
+database "PostgreSQL" as DB
+
+== Caso de Uso: Postar Atualização (Pro) ==
+
+Institution -> Front : Preenche post\n(título, conteúdo, tipo)
+activate Front
+
+Front -> Controller : POST /api/v1/posts\n{title, content,\npost_type: "update"}
+activate Controller
+
+Controller -> Controller : verify JWT\n(role == institution)
+
+Controller -> Service : create(params, institution_id)
+activate Service
+
+Service -> DB : SELECT plan FROM subscriptions\nWHERE institution_id = ?\nAND status = 'active'
+activate DB
+DB --> Service : subscription
+deactivate DB
+
+alt subscription.plan != 'pro'
+  Service --> Controller : 403 Forbidden
+else subscription.plan == 'pro'
+  Service -> DB : INSERT INTO posts\n(institution_id, title, content,\npost_type, published_at: NOW())
+  activate DB
+  DB --> Service : post
+  deactivate DB
+
+  Service --> Controller : post
+end
+
+deactivate Service
+
+Controller --> Front : 201 Created\n{post}\nou 403 Forbidden
+deactivate Controller
+
+Front --> Institution : Exibe post publicado\nou erro
+deactivate Front
+
+== Caso de Uso: Upload Comprovante ==
+
+Institution -> Front : Seleciona arquivo\n(descrição)
+activate Front
+
+Front -> Controller : POST /api/v1/posts/:id/attachments\nmultipart/form-data\n{file, file_type, description}
+activate Controller
+
+Controller -> Service : add_attachment(post_id, file)
+activate Service
+
+Service -> Service : Upload to storage\n(S3/CloudFlare)
+
+Service -> DB : INSERT INTO post_attachments\n(post_id, file_url,\nfile_type, description)
+activate DB
+DB --> Service : attachment
+deactivate DB
+
+Service --> Controller : attachment
+deactivate Service
+
+Controller --> Front : 201 Created\n{attachment}
+deactivate Controller
+
+Front --> Institution : Exibe arquivo anexado
+deactivate Front
+
+@enduml

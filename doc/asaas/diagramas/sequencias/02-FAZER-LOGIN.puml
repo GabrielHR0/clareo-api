@@ -1,0 +1,52 @@
+@startuml Sequencia - Fazer Login
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Fazer Login
+
+actor "Usuário" as User
+participant "Frontend" as Front
+participant "AuthController" as Auth
+participant "UserService" as Service
+database "PostgreSQL" as DB
+
+== Caso de Uso: Fazer Login ==
+
+User -> Front : Preenche email e senha
+activate Front
+
+Front -> Auth : POST /api/v1/auth/login\n{email, password}
+activate Auth
+
+Auth -> Service : find_by_email(email)
+activate Service
+
+Service -> DB : SELECT * FROM users\nWHERE email = ?
+activate DB
+DB --> Service : user
+deactivate DB
+
+Service --> Auth : user
+deactivate Service
+
+Auth -> Auth : bcrypt.verify(password,\nuser.password_digest)
+
+alt senha correta
+  Auth -> Auth : generate JWT(user_id)
+  Auth --> Front : 200 OK\n{token, user}
+else senha incorreta
+  Auth --> Front : 401 Unauthorized\n{error: "Credenciais inválidas"}
+end
+
+deactivate Auth
+
+Front --> User : Redireciona para\ndashboard ou exibe erro
+deactivate Front
+
+@enduml

@@ -1,0 +1,44 @@
+@startuml Sequencia - Ver Doacoes
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Ver Doações
+
+actor "Instituição" as Institution
+participant "Frontend" as Front
+participant "DonationsController" as Controller
+database "PostgreSQL" as DB
+
+== Caso de Uso: Ver Doações Recebidas ==
+
+Institution -> Front : Acessa painel de doações
+activate Front
+
+Front -> Controller : GET /api/v1/donations\n?institution_id=123\n&page=1&per_page=20
+activate Controller
+
+Controller -> Controller : verify JWT\n(role == institution)
+
+Controller -> DB : SELECT d.*, ds.amount,\nds.percentual, ds.status\nFROM donations d\nJOIN donation_splits ds\nON d.id = ds.donation_id\nWHERE ds.institution_id = ?\nORDER BY d.created_at DESC\nLIMIT 20 OFFSET 0
+activate DB
+DB --> Controller : donations
+deactivate DB
+
+Controller -> DB : SELECT COUNT(*)\nFROM donation_splits\nWHERE institution_id = ?
+activate DB
+DB --> Controller : total_count
+deactivate DB
+
+Controller --> Front : 200 OK\n{donations: [...],\ntotal: 45,\npage: 1,\nper_page: 20}
+deactivate Controller
+
+Front --> Institution : Exibe lista de doações\ncom valores e status
+deactivate Front
+
+@enduml

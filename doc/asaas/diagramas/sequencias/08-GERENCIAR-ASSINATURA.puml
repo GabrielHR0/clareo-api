@@ -1,0 +1,100 @@
+@startuml Sequencia - Gerenciar Assinatura
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Gerenciar Assinatura
+
+actor "Instituição" as Institution
+participant "Frontend" as Front
+participant "SubscriptionController" as Controller
+participant "SubscriptionService" as Service
+participant "AsaasService" as Asaas
+database "PostgreSQL" as DB
+
+== Caso de Uso: Ver Plano Atual ==
+
+Institution -> Front : Acessa configurações
+activate Front
+
+Front -> Controller : GET /api/v1/subscription
+activate Controller
+
+Controller -> DB : SELECT * FROM subscriptions\nWHERE institution_id = ?
+activate DB
+DB --> Controller : subscription
+deactivate DB
+
+Controller --> Front : 200 OK\n{plan: "pro",\nstatus: "active",\namount: 99.90,\ncurrent_period_end: "2026-09-30"}
+deactivate Controller
+
+Front --> Institution : Exibe plano atual
+deactivate Front
+
+== Caso de Uso: Fazer Upgrade para Pro ==
+
+Institution -> Front : Clica em "Upgrade para Pro"
+activate Front
+
+Front -> Controller : POST /api/v1/subscription/upgrade\n{plan: "pro"}
+activate Controller
+
+Controller -> Service : upgrade(institution_id)
+activate Service
+
+Service -> DB : SELECT * FROM subscriptions\nWHERE institution_id = ?
+activate DB
+DB --> Service : subscription
+deactivate DB
+
+alt subscription.plan == 'pro'
+  Service --> Controller : 400 Bad Request\n{error: "Já é plano Pro"}
+else subscription.plan == 'free'
+  Service -> Asaas : create_subscription(\ncustomer_id, value: 99.90,\nbillingType: "PIX",\ncycle: "MONTHLY")
+  activate Asaas
+  Asaas --> Service : {id: "sub_abc123",\ninvoiceUrl: "..."}
+  deactivate Asaas
+
+  Service -> DB : UPDATE subscriptions\nSET plan = 'pro',\nstatus = 'pending',\nasaas_subscription_id = ?\nWHERE institution_id = ?
+  activate DB
+  DB --> Service : updated
+  deactivate DB
+
+  Service --> Controller : subscription
+end
+
+deactivate Service
+
+Controller --> Front : 200 OK\n{subscription, invoice_url}
+deactivate Controller
+
+Front --> Institution : Exibe QR Code\npara pagamento da assinatura
+deactivate Front
+
+== Webhook: Assinatura Confirmada ==
+
+participant "Asaas" as AsaasWH
+
+AsaasWH -> Controller : POST /api/v1/webhooks/asaas\n{event: "SUBSCRIPTION_CREATED",\nsubscription_id: "sub_abc123"}
+activate Controller
+
+Controller -> Service : confirm(subscription_id)
+activate Service
+
+Service -> DB : UPDATE subscriptions\nSET status = 'active'\nWHERE asaas_subscription_id = ?
+activate DB
+DB --> Service : updated
+deactivate DB
+
+Service --> Controller : subscription
+deactivate Service
+
+Controller --> AsaasWH : 200 OK
+deactivate Controller
+
+@enduml

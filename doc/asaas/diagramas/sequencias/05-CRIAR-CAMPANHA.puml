@@ -1,0 +1,56 @@
+@startuml Sequencia - Criar Campanha
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Criar Campanha
+
+actor "Instituição" as Institution
+participant "Frontend" as Front
+participant "CampaignsController" as Controller
+participant "CampaignService" as Service
+database "PostgreSQL" as DB
+
+== Caso de Uso: Criar Campanha (Pro) ==
+
+Institution -> Front : Preenche formulário\n(título, descrição, meta,\ndata início, data fim)
+activate Front
+
+Front -> Controller : POST /api/v1/campaigns\n{title, description,\ngoal_amount, start_date,\nend_date, cover_image_url}
+activate Controller
+
+Controller -> Controller : verify JWT\n(role == institution)
+
+Controller -> Service : create(params, institution_id)
+activate Service
+
+Service -> DB : SELECT plan FROM subscriptions\nWHERE institution_id = ?\nAND status = 'active'
+activate DB
+DB --> Service : subscription
+deactivate DB
+
+alt subscription.plan != 'pro'
+  Service --> Controller : 403 Forbidden\n{error: "Requer plano Pro"}
+else subscription.plan == 'pro'
+  Service -> DB : INSERT INTO campaigns\n(institution_id, title, description,\ngoal_amount, start_date,\nend_date, status: 'active')
+  activate DB
+  DB --> Service : campaign
+  deactivate DB
+
+  Service --> Controller : campaign
+end
+
+deactivate Service
+
+Controller --> Front : 201 Created\n{campaign}\nou 403 Forbidden
+deactivate Controller
+
+Front --> Institution : Exibe campanha criada\nou mensagem de erro
+deactivate Front
+
+@enduml
