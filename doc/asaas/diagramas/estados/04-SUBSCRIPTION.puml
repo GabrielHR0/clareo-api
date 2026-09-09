@@ -1,0 +1,68 @@
+@startuml Estado - Subscription
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam stateFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor<<active>> LightBlue
+  BackgroundColor<<final>> LightGreen
+  BackgroundColor<<error>> LightRed
+  BorderColor DarkGray
+  FontSize 12
+}
+
+title Estado: Subscription (Assinatura)
+
+[*] --> active : Assinatura gratuita\ncriada no cadastro
+
+active --> pending : Instituição\nsolicita upgrade
+
+pending --> active : Pagamento\nconfirmado
+
+pending --> canceled : Instituição\ncancela antes\nde pagar
+
+active --> canceled : Instituição\ncancela assinatura
+
+canceled --> expired : Período\nfinalizado
+
+active --> expired : Pagamento\nnão confirmado\napós vencimento
+
+expired --> [*]
+canceled --> [*]
+
+state active <<active>>
+state pending <<active>>
+state canceled <<error>>
+state expired <<error>>
+
+note right of active
+  Assinatura ativa.
+  Plano gratuito ou Pro.
+  Funcionalidades
+  liberadas conforme plano.
+end note
+
+note left of pending
+  Aguardando pagamento
+  do upgrade.
+  Funcionalidades Pro
+  bloqueadas.
+end note
+
+note bottom of canceled
+  Assinatura cancelada
+  pela instituição.
+  Funcionalidades Pro
+  desativadas.
+end note
+
+note right of expired
+  Assinatura expirada
+  por falta de pagamento.
+  Requer nova cobrança
+  para reativar.
+end note
+
+@enduml
