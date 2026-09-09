@@ -4,12 +4,10 @@ skinparam defaultFontName Arial
 skinparam defaultFontSize 11
 skinparam classFontSize 12
 skinparam classAttributeFontSize 10
-skinparam classFontSize 12
 skinparam titleFontSize 16
 skinparam titleFontStyle bold
-skinparam linetype ortho
-skinparam nodesep 60
-skinparam ranksep 50
+skinparam nodesep 40
+skinparam ranksep 40
 
 title Clareo — Diagrama de Classe do Sistema
 
@@ -32,12 +30,6 @@ interface "Notificavel" as INotifiable {
   + verify_signature(signature, body) : Boolean
 }
 
-interface "Relatoravel" as IReportable {
-  + generate_report(params) : Report
-  + download_report(id) : File
-  + list_reports(institution_id) : Array
-}
-
 ' ===== Classes de Modelo =====
 
 class User {
@@ -46,17 +38,12 @@ class User {
   - email : String
   - password_digest : String
   - role : String
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
-  + has_secure_password()
   + institutions() : Array
   + donations() : Array
   + donor?() : Boolean
   + institution?() : Boolean
   + admin?() : Boolean
-  + as_json() : Hash
 }
 
 class Institution {
@@ -69,10 +56,7 @@ class Institution {
   - asaas_customer_id : String
   - asaas_wallet_id : String
   - active : Boolean
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + user() : User
   + donation_splits() : Array
   + campaigns() : Array
@@ -81,7 +65,6 @@ class Institution {
   + reports() : Array
   + active?() : Boolean
   + pro?() : Boolean
-  + as_json() : Hash
 }
 
 class Donation {
@@ -93,22 +76,14 @@ class Donation {
   - fee_amount : Decimal
   - net_amount : Decimal
   - asaas_payment_id : String
-  - asaas_payment_url : String
   - status : String
-  - metadata : JSON
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + user() : User
   + donation_splits() : Array
   + pending?() : Boolean
   + received?() : Boolean
   + split_done?() : Boolean
   + failed?() : Boolean
-  + refunded?() : Boolean
-  + update_status(new_status)
-  + as_json() : Hash
 }
 
 class DonationSplit {
@@ -119,21 +94,12 @@ class DonationSplit {
   - percentual : Decimal
   - asaas_split_id : String
   - status : String
-  - metadata : JSON
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + donation() : Donation
   + institution() : Institution
   + pending?() : Boolean
-  + awaiting_credit?() : Boolean
   + done?() : Boolean
   + refused?() : Boolean
-  + cancelled?() : Boolean
-  + refunded?() : Boolean
-  + update_status(new_status)
-  + as_json() : Hash
 }
 
 class Campaign {
@@ -145,23 +111,17 @@ class Campaign {
   - current_amount : Decimal
   - start_date : Date
   - end_date : Date
-  - cover_image_url : String
   - status : String
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + institution() : Institution
   + donations() : Array
   + active?() : Boolean
   + paused?() : Boolean
   + closed?() : Boolean
-  + expired?() : Boolean
   + progress_percent() : Float
   + pause()
   + resume()
   + close()
-  + as_json() : Hash
 }
 
 class Post {
@@ -171,17 +131,12 @@ class Post {
   - content : String
   - post_type : String
   - published_at : DateTime
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + institution() : Institution
   + post_attachments() : Array
   + update?() : Boolean
   + receipt?() : Boolean
-  + report?() : Boolean
   + published?() : Boolean
-  + as_json() : Hash
 }
 
 class PostAttachment {
@@ -190,14 +145,10 @@ class PostAttachment {
   - file_url : String
   - file_type : String
   - description : String
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + post() : Post
   + pdf?() : Boolean
   + image?() : Boolean
-  + as_json() : Hash
 }
 
 class Subscription {
@@ -209,21 +160,13 @@ class Subscription {
   - asaas_subscription_id : String
   - current_period_start : Date
   - current_period_end : Date
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + institution() : Institution
   + free?() : Boolean
   + pro?() : Boolean
   + active?() : Boolean
-  + canceled?() : Boolean
-  + expired?() : Boolean
-  + features() : Array
   + can_create_campaigns?() : Boolean
   + can_post_updates?() : Boolean
-  + can_generate_reports?() : Boolean
-  + as_json() : Hash
 }
 
 class DonationReport {
@@ -233,21 +176,12 @@ class DonationReport {
   - period_end : Date
   - format : String
   - file_url : String
-  - generated_at : DateTime
   - total_donations : Integer
   - total_amount : Decimal
-  - average_donation : Decimal
-  - summary : JSON
-  - created_at : DateTime
-  - updated_at : DateTime
   --
-  + initialize(params)
   + institution() : Institution
   + pdf?() : Boolean
   + csv?() : Boolean
-  + generated?() : Boolean
-  + download_url() : String
-  + as_json() : Hash
 }
 
 ' ===== Classes de Serviço =====
@@ -256,30 +190,22 @@ class AsaasService {
   - api_key : String
   - base_url : String
   --
-  + initialize()
   + create_customer(params) : Hash
   + create_subaccount(params) : Hash
-  + get_wallet(wallet_id) : Hash
   + create_payment(params) : Hash
   + get_payment(id) : Hash
-  + list_payments(params) : Hash
   + create_subscription(params) : Hash
   + self.verify_webhook(request) : Boolean
-  - post(path, body) : Hash
-  - get(path, params) : Hash
-  - request(method, path, body) : Hash
 }
 
 class DonationService {
-  --
   + create(params) : Donation
   + confirm(asaas_payment_id) : Donation
-  + calculate_splits(institution_ids, amount) : Array
+  + calculate_splits(ids, amount) : Array
 }
 
 class CampaignService {
-  --
-  + create(params, institution_id) : Campaign
+  + create(params, inst_id) : Campaign
   + update(id, params) : Campaign
   + pause(id) : Campaign
   + resume(id) : Campaign
@@ -287,62 +213,58 @@ class CampaignService {
 }
 
 class PostService {
-  --
-  + create(params, institution_id) : Post
+  + create(params, inst_id) : Post
   + update(id, params) : Post
   + delete(id) : Boolean
   + add_attachment(post_id, file) : PostAttachment
 }
 
 class ReportService {
-  --
-  + generate(params, institution_id) : DonationReport
-  + calculate_stats(institution_id, period) : Hash
+  + generate(params, inst_id) : DonationReport
+  + calculate_stats(inst_id, period) : Hash
   + generate_file(report) : String
 }
 
 class SubscriptionService {
-  --
-  + upgrade(institution_id) : Subscription
-  + cancel(institution_id) : Subscription
-  + confirm(subscription_id) : Subscription
+  + upgrade(inst_id) : Subscription
+  + cancel(inst_id) : Subscription
+  + confirm(sub_id) : Subscription
 }
 
 class WebhookService {
-  --
   + process(params) : Boolean
-  + handle_payment_received(payment_id) : Donation
-  + handle_split_done(payment_id) : Donation
-  + handle_subscription_created(subscription_id) : Subscription
+  + handle_payment_received(id) : Donation
+  + handle_split_done(id) : Donation
+  + handle_subscription_created(id) : Subscription
 }
 
 ' ===== Relacionamentos =====
 
-User "1" -- "0..*" Institution : possui
-User "1" -- "0..*" Donation : realiza
+User "1" -- "0..*" Institution
+User "1" -- "0..*" Donation
 
-Institution "1" -- "1" Subscription : possui
-Institution "1" -- "0..*" DonationSplit : recebe
-Institution "1" -- "0..*" Campaign : cria
-Institution "1" -- "0..* Post : publica
-Institution "1" -- "0..*" DonationReport : gera
+Institution "1" -- "1" Subscription
+Institution "1" -- "0..*" DonationSplit
+Institution "1" -- "0..*" Campaign
+Institution "1" -- "0..*" Post
+Institution "1" -- "0..*" DonationReport
 
-Donation "1" -- "1..*" DonationSplit : gera
+Donation "1" -- "1..*" DonationSplit
 
-Campaign "0..*" -- "0..*" Donation : direciona
+Campaign "0..*" -- "0..*" Donation
 
-Post "1" -- "0..*" PostAttachment : contém
+Post "1" -- "0..*" PostAttachment
 
 ' ===== Dependências =====
 
 AsaasService ..|> IPayable
 AsaasService ..|> INotifiable
-DonationService ..> AsaasService : usa
-CampaignService ..> AsaasService : usa
-ReportService ..> Donation : consulta
-SubscriptionService ..> AsaasService : usa
-WebhookService ..> AsaasService : verifica
-WebhookService ..> DonationService : usa
-WebhookService ..> SubscriptionService : usa
+DonationService ..> AsaasService
+CampaignService ..> AsaasService
+SubscriptionService ..> AsaasService
+WebhookService ..> AsaasService
+WebhookService ..> DonationService
+WebhookService ..> SubscriptionService
+ReportService ..> Donation
 
 @enduml
