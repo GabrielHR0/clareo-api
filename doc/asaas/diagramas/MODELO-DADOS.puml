@@ -1,0 +1,159 @@
+@startuml Modelo de Dados - Clareo
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam classAttributeFontSize 10
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 60
+
+title Clareo — Modelo de Dados (Diagrama Entidade-Relacionamento)
+
+entity "users" as users {
+  * **id** : SERIAL <<PK>>
+  --
+  name : VARCHAR(255) NOT NULL
+  email : VARCHAR(255) UNIQUE NOT NULL
+  password_digest : VARCHAR(255) NOT NULL
+  role : VARCHAR(20) NOT NULL
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "institutions" as institutions {
+  * **id** : SERIAL <<PK>>
+  --
+  * user_id : INTEGER <<FK>>
+  name : VARCHAR(255) NOT NULL
+  cnpj : VARCHAR(18) UNIQUE NOT NULL
+  description : TEXT
+  pix_key : VARCHAR(255) NOT NULL
+  asaas_customer_id : VARCHAR(50) UNIQUE NOT NULL
+  asaas_wallet_id : VARCHAR(50) UNIQUE NOT NULL
+  active : BOOLEAN DEFAULT true
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "donations" as donations {
+  * **id** : SERIAL <<PK>>
+  --
+  user_id : INTEGER <<FK>> NULL
+  donor_name : VARCHAR(255) NOT NULL
+  donor_email : VARCHAR(255) NOT NULL
+  amount_brl : DECIMAL(15,2) NOT NULL
+  fee_amount : DECIMAL(15,2) DEFAULT 0
+  net_amount : DECIMAL(15,2) DEFAULT 0
+  asaas_payment_id : VARCHAR(50) UNIQUE NOT NULL
+  asaas_payment_url : VARCHAR(500)
+  status : VARCHAR(20) NOT NULL
+  metadata : JSONB DEFAULT '{}'
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "donation_splits" as splits {
+  * **id** : SERIAL <<PK>>
+  --
+  * donation_id : INTEGER <<FK>>
+  * institution_id : INTEGER <<FK>>
+  amount : DECIMAL(15,2) NOT NULL
+  percentual : DECIMAL(5,2)
+  asaas_split_id : VARCHAR(50) UNIQUE NOT NULL
+  status : VARCHAR(20) NOT NULL
+  metadata : JSONB DEFAULT '{}'
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "campaigns" as campaigns {
+  * **id** : SERIAL <<PK>>
+  --
+  * institution_id : INTEGER <<FK>>
+  title : VARCHAR(255) NOT NULL
+  description : TEXT NOT NULL
+  goal_amount : DECIMAL(15,2) NOT NULL
+  current_amount : DECIMAL(15,2) DEFAULT 0
+  start_date : DATE NOT NULL
+  end_date : DATE NOT NULL
+  cover_image_url : VARCHAR(500)
+  status : VARCHAR(20) NOT NULL
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "posts" as posts {
+  * **id** : SERIAL <<PK>>
+  --
+  * institution_id : INTEGER <<FK>>
+  title : VARCHAR(255) NOT NULL
+  content : TEXT NOT NULL
+  post_type : VARCHAR(20) NOT NULL
+  published_at : TIMESTAMP NOT NULL
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "post_attachments" as attachments {
+  * **id** : SERIAL <<PK>>
+  --
+  * post_id : INTEGER <<FK>>
+  file_url : VARCHAR(500) NOT NULL
+  file_type : VARCHAR(50) NOT NULL
+  description : VARCHAR(255)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "subscriptions" as subscriptions {
+  * **id** : SERIAL <<PK>>
+  --
+  * institution_id : INTEGER <<FK>>
+  plan : VARCHAR(20) NOT NULL
+  status : VARCHAR(20) NOT NULL
+  amount : DECIMAL(10,2) DEFAULT 0
+  asaas_subscription_id : VARCHAR(50)
+  current_period_start : DATE
+  current_period_end : DATE
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "donation_reports" as reports {
+  * **id** : SERIAL <<PK>>
+  --
+  * institution_id : INTEGER <<FK>>
+  period_start : DATE NOT NULL
+  period_end : DATE NOT NULL
+  format : VARCHAR(10) NOT NULL
+  file_url : VARCHAR(500)
+  generated_at : TIMESTAMP
+  total_donations : INTEGER DEFAULT 0
+  total_amount : DECIMAL(15,2) DEFAULT 0
+  average_donation : DECIMAL(15,2) DEFAULT 0
+  summary : JSONB DEFAULT '{}'
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+' ===== Relacionamentos =====
+
+users ||--o{ institutions : "possui"
+users ||--o{ donations : "realiza"
+
+institutions ||--|| subscriptions : "possui"
+institutions ||--o{ donation_splits : "recebe"
+institutions ||--o{ campaigns : "cria"
+institutions ||--o{ posts : "publica"
+institutions ||--o{ reports : "gera"
+
+donations ||--o{ donation_splits : "gera"
+
+campaigns ||--o{ donations : "direciona"
+
+posts ||--o{ post_attachments : "contém"
+
+@enduml
