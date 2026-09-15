@@ -43,7 +43,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 end
 
-gem "kino", "~> 0.6.0"
+gem "kino", "~> 0.7.0"
 
 gem "rspec-rails", "~> 8.0", groups: [:development, :test]
 
