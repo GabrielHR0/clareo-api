@@ -49,7 +49,7 @@ gem "rspec-rails", "~> 8.0", groups: [:development, :test]
 
 gem "alba", "~> 4.0"
 
-gem "jwt", "~> 3.2"
+gem "jwt", "~> 3.3"
 
 gem "bcrypt", "~> 3.1"
 

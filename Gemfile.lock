@@ -125,7 +125,7 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     json (2.21.2)
-    jwt (3.2.0)
+    jwt (3.3.0)
       base64
     kamal (2.12.0)
       activesupport (>= 7.0)
@@ -400,7 +400,7 @@ DEPENDENCIES
   debug
   dotenv-rails (~> 3.2)
   foreman (~> 0.9)
-  jwt (~> 3.2)
+  jwt (~> 3.3)
   kamal
   kino (~> 0.6.0)
   pg (~> 1.1)
