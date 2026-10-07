@@ -1,0 +1,2 @@
+class InvalidSubscription < DomainError
+end
