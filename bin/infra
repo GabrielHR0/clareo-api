@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Sobe a infraestrutura local do Clareo sem Docker.
+#
+# PostgreSQL: o WSL já traz um cluster gerenciado por systemd em 5432. Ele é
+# verificado, não gerenciado — iniciar um serviço do systemd exigiria sudo.
+# O Redis não vem instalado no WSL, então é compilado e gerenciado aqui.
+#
+# Uso: bin/infra start | stop | status | redis-restart
+
+set -uo pipefail
+
+CLAREO_HOME="$HOME/.clareo"
+PGBIN=/usr/lib/postgresql/16/bin
+PGPORT="${DATABASE_PORT:-5432}"
+REDIS_PREFIX="$CLAREO_HOME/redis"
+REDIS_DATA="$CLAREO_HOME/redis-data"
+
+COMMAND="${1:-status}"
+
+pg_reachable() {
+  "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PGPORT" >/dev/null 2>&1
+}
+
+check_postgres() {
+  if pg_reachable; then
+    echo "postgres (:$PGPORT): rodando"
+    return 0
+  fi
+
+  echo "postgres (:$PGPORT): PARADO" >&2
+  echo "  o cluster do WSL é gerenciado por systemd e precisa de sudo para iniciar:" >&2
+  echo "    sudo service postgresql start" >&2
+  return 1
+}
+
+start_redis() {
+  if "$REDIS_PREFIX/bin/redis-cli" ping >/dev/null 2>&1; then
+    echo "redis (:6379): ja rodando"
+    return 0
+  fi
+
+  if [ ! -x "$REDIS_PREFIX/bin/redis-server" ]; then
+    echo "redis: binarios ausentes em $REDIS_PREFIX" >&2
+    echo "  recompile com: bin/infra-build-redis" >&2
+    return 1
+  fi
+
+  mkdir -p "$REDIS_DATA"
+  "$REDIS_PREFIX/bin/redis-server" \
+    --daemonize yes \
+    --dir "$REDIS_DATA" \
+    --port 6379 \
+    --bind 127.0.0.1 \
+    --logfile "$CLAREO_HOME/redis.log" \
+    --save '900 1' \
+    --appendonly no
+  echo "redis (:6379): iniciado"
+}
+
+stop_all() {
+  "$REDIS_PREFIX/bin/redis-cli" shutdown nosave >/dev/null 2>&1 && echo "redis: parado"
+  echo "postgres: gerenciado por systemd, use 'sudo service postgresql stop'"
+}
+
+show_status() {
+  printf 'postgres (:%s): ' "$PGPORT"
+  if pg_reachable; then echo "rodando"; else echo "parado"; fi
+
+  printf 'redis    (:6379): '
+  if "$REDIS_PREFIX/bin/redis-cli" ping >/dev/null 2>&1; then echo "rodando"; else echo "parado"; fi
+}
+
+case "$COMMAND" in
+  start)
+    mkdir -p "$CLAREO_HOME"
+    check_postgres
+    start_redis
+    ;;
+  stop)
+    stop_all
+    ;;
+  status)
+    show_status
+    ;;
+  *)
+    echo "uso: bin/infra [start|stop|status]"
+    exit 1
+    ;;
+esac
