@@ -1,7 +1,5 @@
 require_relative "boot"
 
-Dotenv.load(".env")
-
 require "rails"
 # Pick the frameworks you want:
 require "active_model/railtie"
