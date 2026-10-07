@@ -1,5 +1,14 @@
 # See https://git-scm.com/docs/gitattributes for more about git attribute files.
 
+# Normaliza fim de linha para LF em todo arquivo de texto, no repositório e no
+# worktree. O projeto roda em WSL (Linux); sem isso, um checkout feito no
+# Windows traz CRLF e o git acusa diff em arquivo que ninguém editou.
+* text=auto eol=lf
+
+# Exceções: precisam de CRLF para executar no Windows.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # Mark the database schema as having been generated.
 db/schema.rb linguist-generated
 
