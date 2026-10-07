@@ -1,209 +1,281 @@
 # Clareo — Autenticação JWT
 
-> Referências:
-> - https://github.com/jwt/ruby-jwt
-> - https://rubyonrails.org/docs/security
+> Bearer token HS256, expiração de 24 horas, blacklist em Redis.
 
-## Visão Geral
+## Papéis
 
-Autenticação baseada em JWT (JSON Web Tokens):
-- Tokens expiram em 24 horas
-- Refresh tokens para renovação
-- Roles: donor, beneficiary, admin
+| Papel | Alcance |
+|-------|---------|
+| `donor` | apenas as próprias doações |
+| `institution_admin` | instituições que administra |
+| `platform_admin` | tudo, mais endpoints operacionais |
 
-## Configuração
+Uma assinatura por usuário; um usuário administra de 1 a N instituições.
+Papel é do **usuário**, não da instituição.
 
-### Gem Ruby
-
-```ruby
-# Gemfile
-gem 'jwt' # Geração e validação de JWT
-gem 'bcrypt' # Hash de senhas
-```
-
-### Variáveis de Ambiente
+## Variáveis
 
 ```bash
 # .env
-JWT_SECRET=sua_chave_secreta_mínimo_32_bytes
-JWT_EXPIRATION=86400 # 24 horas em segundos
+JWT_SECRET=minimo_32_bytes_aleatorios
+JWT_EXPIRATION=86400
 ```
 
-## Geração de Token
+`JWT_SECRET` com menos de 32 bytes é trivialmente forçável em brute force de
+HMAC. `bin/rails secret` gera um adequate.
+
+## Emissão
 
 ```ruby
-# app/services/auth_service.rb
-class AuthService
-  SECRET_KEY = ENV['JWT_SECRET']
-  EXPIRATION = ENV['JWT_EXPIRATION'].to_i || 86400
+# app/adapters/primary/auth/token_encoder.rb
+class Auth::TokenEncoder
+  ALGORITHM = "HS256"
 
-  def self.encode(payload)
-    payload[:exp] = Time.now.to_i + EXPIRATION
-    payload[:iat] = Time.now.to_i
-
-    JWT.encode(payload, SECRET_KEY, 'HS256')
+  def initialize(secret: ENV.fetch("JWT_SECRET"), expiration: Integer(ENV.fetch("JWT_EXPIRATION", 86_400)))
+    @secret = secret
+    @expiration = expiration
   end
 
-  def self.decode(token)
-    decoded = JWT.decode(token, SECRET_KEY, true, { algorithm: 'HS256' })
-    HashWithIndifferentAccess.new(decoded.first)
-  rescue JWT::DecodeError, JWT::ExpiredSignature => e
-    nil
+  def call(user)
+    now = Time.now.to_i
+    payload = {
+      sub: user.id.to_s,
+      email: user.email,
+      role: user.role,
+      iat: now,
+      exp: now + @expiration
+    }
+
+    JWT.encode(payload, @secret, ALGORITHM)
   end
 end
 ```
 
-## Login
+### O Que Vai no Token
+
+`sub`, `email`, `role`, `iat`, `exp`.
+
+O papel **pode** ir no token — economiza uma consulta por requisição, e o
+descarte é imperfeito: um usuário rebaixado de `platform_admin` continua com
+token válido até expirar. Para o volume deste produto, 24 horas é aceitável. Se
+vir a incomodar, versione o token e invalide por versão.
+
+O `institution_id` **não** vai no token. São N por usuário e mudam com
+frequência; manter no token exigiria reemissão a cada instituição nova.
+
+## Validação
 
 ```ruby
-# app/controllers/api/v1/auth_controller.rb
-class Api::V1::AuthController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:login, :register]
+# app/adapters/primary/auth/token_decoder.rb
+class Auth::TokenDecoder
+  ALGORITHM = "HS256"
 
-  def login
-    user = User.find_by(email: params[:email])
-
-    if user&.authenticate(params[:password])
-      token = AuthService.encode(user_id: user.id, role: user.role)
-
-      render json: {
-        token: token,
-        user: UserSerializer.new(user)
-      }
-    else
-      render json: { error: 'Email ou senha inválidos' }, status: :unauthorized
-    end
+  def initialize(secret: ENV.fetch("JWT_SECRET"))
+    @secret = secret
   end
 
-  def register
-    user = User.new(user_params)
-
-    if user.save
-      token = AuthService.encode(user_id: user.id, role: user.role)
-
-      render json: {
-        token: token,
-        user: UserSerializer.new(user)
-      }, status: :created
-    else
-      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-    end
-  end
-
-  private
-
-  def user_params
-    params.permit(:email, :name, :password, :password_confirmation)
+  def call(token)
+    payload, = JWT.decode(token, @secret, true, algorithm: ALGORITHM)
+    payload
+  rescue JWT::ExpiredSignature
+    raise Auth::ExpiredError
+  rescue JWT::DecodeError
+    raise Auth::InvalidError
   end
 end
 ```
 
-## Middleware de Autenticação
+**`algorithm: ALGORITHM` é obrigatório.** Sem ele o JWT aceita o algoritmo
+escrito no próprio token, e `alg: none` passa. É uma vulnerabilidade real, não
+teórica.
+
+## Autenticação e Autorização
 
 ```ruby
 # app/controllers/application_controller.rb
 class ApplicationController < ActionController::API
   before_action :authenticate_user!
 
+  rescue_from DomainError do |error|
+    render json: { error: error.message, code: error.code }, status: :unprocessable_entity
+  end
+
   private
 
   def authenticate_user!
-    token = request.headers['Authorization']&.split(' ')&.last
+    token = bearer_token
+    return unauthorized("Token não fornecido") if token.nil?
 
-    if token.nil?
-      render json: { error: 'Token não fornecido' }, status: :unauthorized
-      return
-    end
+    payload = Auth::TokenDecoder.new.call(token)
+    return unauthorized("Token expirado") if payload.nil?
 
-    decoded = AuthService.decode(token)
+    return unauthorized("Token revogado") if revoked?(payload["jti"])
 
-    if decoded.nil?
-      render json: { error: 'Token inválido ou expirado' }, status: :unauthorized
-      return
-    end
-
-    @current_user = User.find_by(id: decoded[:user_id])
-
-    if @current_user.nil?
-      render json: { error: 'Usuário não encontrado' }, status: :unauthorized
-    end
+    @current_user = User.find_by(id: payload["sub"])
+    return unauthorized("Usuário não encontrado") if @current_user.nil?
+  rescue Auth::ExpiredError
+    unauthorized("Token expirado")
+  rescue Auth::InvalidError
+    unauthorized("Token inválido")
   end
 
-  def current_user
-    @current_user
+  # Autorização é sobre o RECURSO, não sobre o token.
+  def authorize_institution!(institution)
+    return if current_user.platform_admin?
+    return if current_user.owns?(institution)
+
+    render json: { error: "Não autorizado" }, status: :forbidden
   end
 
-  def authorize_role!(*roles)
-    unless roles.include?(current_user.role)
-      render json: { error: 'Não autorizado' }, status: :forbidden
-    end
+  def require_platform_admin!
+    return if current_user&.platform_admin?
+
+    render json: { error: "Não autorizado" }, status: :forbidden
+  end
+
+  def bearer_token
+    request.headers["Authorization"]&.split(" ")&.last
+  end
+
+  def revoked?(jti)
+    return false if jti.nil?
+
+    Rails.cache.exist?("jwt:revoked:#{jti}")
+  end
+
+  def unauthorized(message)
+    render json: { error: message }, status: :unauthorized
   end
 end
 ```
 
-## Exemplo de Uso
+Token válido **não** implica autorização. `institution_admin` não lê a doação de
+outra instituição só porque tem JWT válido.
 
-### Headers
-
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
-```
-
-### Controller Protegido
+## Login
 
 ```ruby
-class Api::V1::DonationsController < ApplicationController
-  def create
-    donation = DonationService.create(donation_params, current_user)
-    render json: donation
-  end
+# app/adapters/primary/api/v1/auth_controller.rb
+module Api::V1
+  class AuthController < ApplicationController
+    skip_before_action :authenticate_user!, only: %i[register]
 
-  def show
-    donation = Donation.find(params[:id])
+    def login
+      user = User.find_by(email: params[:email].to_s.downcase)
 
-    # Verificar se o usuário tem acesso
-    unless donation.user_id == current_user.id || current_user.admin?
-      render json: { error: 'Não autorizado' }, status: :forbidden
-      return
+      # Sempre executa o bcrypt, mesmo sem usuário, para não vazar por timing
+      # quem tem conta.
+      valid = user&.authenticate(params[:password].to_s) || BCrypt::Password.create("dummy")
+
+      return render json: { error: "Credenciais inválidas" }, status: :unauthorized unless valid && user
+
+      render json: {
+        token: Auth::TokenEncoder.new.call(user),
+        user: Auth::UserSerializer.new(user).call
+      }
     end
 
-    render json: donation
+    def register
+      user = User.new(register_params)
+
+      if user.save
+        render json: {
+          token: Auth::TokenEncoder.new.call(user),
+          user: Auth::UserSerializer.new(user).call
+        }, status: :created
+      else
+        render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+
+    def logout
+      token = request.headers["Authorization"].split(" ").last
+      jti = JWT.decode(token, ENV.fetch("JWT_SECRET"), true, algorithm: "HS256").first["jti"]
+
+      # TTL = o que resta da expiração. Depois disso o token morre sozinho e a
+      # entrada vira lixo no Redis.
+      ttl = [ token_ttl(jti), 0 ].max
+      Rails.cache.write("jwt:revoked:#{jti}", true, expires_in: ttl) if ttl.positive?
+
+      head :no_content
+    end
+
+    private
+
+    def register_params
+      params.require(:user).permit(:email, :name, :password, :password_confirmation)
+    end
+
+    def token_ttl(jti)
+      payload, = JWT.decode(jti, "", false)
+      payload["exp"].to_i - Time.now.to_i
+    end
   end
 end
 ```
 
-### Admin Only
+### Login Timing
+
+O bcrypt roda mesmo sem usuário encontrado. Sem isso, um login de e-mail
+inexistente responde em 2 ms e um de e-mail existente responde em 100 ms — o
+diferença revela quais e-mails têm conta.
+
+### Logout e Blacklist
+
+O token precisa de `jti` para ser revogável individual. Uma blacklist por
+usuário não funciona bem: logout em um device desloga todos.
+
+A entrada na blacklist expira junto com o token, para não crescer sem limite.
+
+## Senhas
 
 ```ruby
-class Api::V1::Admin::WalletsController < ApplicationController
-  before_action -> { authorize_role!(:admin) }
+class User < ApplicationRecord
+  has_secure_password
 
-  def index
-    wallets = Wallet.all
-    render json: wallets
-  end
+  validates :email, presence: true,
+                    uniqueness: { case_sensitive: false },
+                    format: { with: URI::MailTo::EMAIL_REGEXP }
+  validates :password, length: { minimum: 12 }, if: -> { password.present? }
 end
 ```
+
+Mínimo de **12 caracteres**. Comprimento supera complexidade: `Xk7#mQ2!vR$9` é
+mais forte e mais usável que `Senha@123!` com 9 caracteres.
 
 ## Rate Limiting
 
 ```ruby
 # config/initializers/rack_attack.rb
-Rack::Attack.throttle('requests by ip', limit: 20, period: 1.minute) do |req|
-  req.ip unless req.path.start_with?('/assets')
+Rack::Attack.throttle("login attempts", limit: 5, period: 30.seconds) do |req|
+  req.ip if req.path == "/api/v1/auth/login" && req.post?
 end
 
-Rack::Attack.throttle('login attempts', limit: 5, period: 30.seconds) do |req|
-  if req.path == '/api/v1/auth/login' && req.post?
-    req.ip
-  end
+Rack::Attack.throttle("registration attempts", limit: 3, period: 1.hour) do |req|
+  req.ip if req.path == "/api/v1/auth/register" && req.post?
 end
 ```
 
-## Segurança
+Cinco tentativas a cada 30 segundos permite login legítimo de usuário com senha
+errada, e bloqueia brute force.
 
-- **NUNCA** armazene JWT no localStorage (use HttpOnly cookies em produção)
-- Tokens devem expirar (não use tokens infinitos)
-- Implemente blacklist de tokens para logout
-- Use HTTPS obrigatoriamente
-- Rate limiting em endpoints de auth
+## Onde o Token Fica
+
+| Contexto | Armazenamento |
+|----------|---------------|
+| SPA / SPA mobile | memória, **nunca** `localStorage` |
+| SSR com sessão | cookie `HttpOnly` + `Secure` + `SameSite=Lax` |
+
+`localStorage` é legível por qualquer XSS. `HttpOnly` não.
+
+## Checklist
+
+- [ ] `JWT_SECRET` com 32 bytes ou mais, em variável de ambiente
+- [ ] `algorithm:` explícito no decode
+- [ ] bcrypt executado mesmo sem usuário, para não vazar por timing
+- [ ] blacklist por `jti`, com TTL igual ao do token
+- [ ] autorização por recurso, não só por token
+- [ ] rate limit em login e cadastro
+- [ ] senha mínima de 12 caracteres
+- [ ] token nunca em `localStorage`
+- [ ] `sub`, `exp`, `iat` no payload
