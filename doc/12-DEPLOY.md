@@ -1,22 +1,112 @@
 # Clareo — Deploy e Infraestrutura
 
+## Restrição de Plataforma
+
+**O projeto não roda no Windows.** O servidor [agoo](https://github.com/ohler55/agoo)
+é Linux e macOS only, e é gem nativa — não compila no Windows.
+
+Desenvolvimento local em **WSL (Ubuntu)**:
+
+```bash
+# Dentro do WSL
+ruby -v                       # 3.2.3 ou superior (Rails 8.1 exige >= 3.2)
+bundle install
+bundle exec rspec
+bin/dev
+```
+
+O `Gemfile` não é instalável no Windows. Se aparecer erro de plataforma no
+`bundle install`, você está no lugar errado.
+
+## Stack de Deploy
+
+```
+Internet
+   │  TLS + HTTP/2
+   ▼
+Thruster ──► Agoo ──► Rails 8.1 API
+                 │
+                 ├──► PostgreSQL 16
+                 ├──► Redis 7 (Sidekiq)
+                 └──► Asaas API v3
+```
+
+**Thruster** termina TLS e serve HTTP/2. **Agoo** serve a aplicação Rack. Agoo
+não termina TLS, então o Thruster fica obrigatoriamente na frente em produção.
+
+## Docker
+
+### Dockerfile
+
+Já configurado:
+
+```dockerfile
+FROM docker.io/library/ruby:4.0.6-slim AS base
+WORKDIR /rails
+
+RUN apt-get update -qq && \
+    apt-get install --no-recommends -y curl libjemalloc2 postgresql-client && \
+    ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+ENV RAILS_ENV="production" \
+    BUNDLE_DEPLOYMENT="1" \
+    BUNDLE_PATH="/usr/local/bundle" \
+    BUNDLE_WITHOUT="development" \
+    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+```
+
+Imagem final — **Thruster na frente, Agoo servindo**:
+
+```dockerfile
+EXPOSE 80
+CMD ["./bin/thrust", "./bin/rackup", "-s", "agoo", "-o", "0.0.0.0", "-p", "3000"]
+```
+
+O `rackup` gem entra no `Gemfile` só para isso — Rails 8 não gera o binstub, e o
+Thruster precisa de um para iniciar o Agoo.
+
+### Dockerfile.dev
+
+```dockerfile
+FROM docker.io/library/ruby:4.0.6-slim
+WORKDIR /rails
+
+RUN apt-get update -qq && \
+    apt-get install --no-recommends -y build-essential git libpq-dev libyaml-dev \
+      postgresql-client redis-tools curl && \
+    rm -rf /var/lib/apt/lists
+
+ENV BUNDLE_PATH="/usr/local/bundle"
+
+COPY Gemfile Gemfile.lock ./
+RUN bundle install && rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache
+
+COPY . .
+
+EXPOSE 3000
+CMD ["bin/dev"]
+```
+
 ## Docker Compose
 
 ```yaml
-# docker-compose.yml
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: clareo_production
+      POSTGRES_DB: clareo_development
       POSTGRES_USER: clareo
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clareo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -24,45 +114,51 @@ services:
       - redis_data:/data
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
     build: .
-    command: bundle exec kino -C config/kino.rb
+    command: ./bin/thrust ./bin/rackup -s agoo -o 0.0.0.0 -p 3000
     volumes:
-      - .:/app
+      - .:/rails
       - bundle_cache:/usr/local/bundle
     ports:
       - "3000:3000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://clareo:${DATABASE_PASSWORD}@db:5432/clareo_production
+      DATABASE_URL: postgresql://clareo:${DATABASE_PASSWORD}@db:5432/clareo_development
       REDIS_URL: redis://redis:6379/0
-      RAILS_ENV: production
-      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      RAILS_ENV: development
+      ASAAS_API_KEY: ${ASAAS_API_KEY}
+      ASAAS_ENVIRONMENT: ${ASAAS_ENVIRONMENT}
+      ASAAS_WEBHOOK_URL: ${ASAAS_WEBHOOK_URL}
+      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN}
 
-  sidekiq:
+  worker:
     build: .
-    command: bundle exec sidekiq
+    command: bundle exec sidekiq -C config/sidekiq.yml
     volumes:
-      - .:/app
+      - .:/rails
       - bundle_cache:/usr/local/bundle
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://clareo:${DATABASE_PASSWORD}@db:5432/clareo_production
+      DATABASE_URL: postgresql://clareo:${DATABASE_PASSWORD}@db:5432/clareo_development
       REDIS_URL: redis://redis:6379/0
-      RAILS_ENV: production
-
-  tron_sidecar:
-    build: ./node_sidecar
-    ports:
-      - "3001:3001"
-    environment:
-      TRON_FULL_HOST: ${TRON_FULL_HOST}
-      TRON_API_KEY: ${TRON_API_KEY}
+      RAILS_ENV: development
+      ASAAS_API_KEY: ${ASAAS_API_KEY}
+      ASAAS_ENVIRONMENT: ${ASAAS_ENVIRONMENT}
 
 volumes:
   postgres_data:
@@ -70,218 +166,268 @@ volumes:
   bundle_cache:
 ```
 
-## Configuração do Kino
+> Não há mais `tron_sidecar`. TronWeb era dependência do modelo de stablecoin,
+> removido. Ver [\_arquivados/README.md](_arquivados/README.md).
 
-```ruby
-# config/kino.rb
-port 3000
-workers 4
-threads 1
-mode :threaded  # Rails ainda não suporta Ractors
+## Desenvolvimento Local
 
-# HTTP/2 nativo (habilitado por padrão)
-http2 true
+```bash
+# 1. Dependências
+bundle install
+cp .env.example .env
 
-# Logging
-log_requests true
+# 2. Banco e cache
+docker compose up -d db redis
 
-# Timeouts
-request_timeout 30
+# 3. Schema
+bin/rails db:create db:prepare
 
-# Controle e monitoramento
-control_bind "127.0.0.1:9293"
-
-# Graceful shutdown
-shutdown_timeout 30
+# 4. Subir API e worker
+bin/dev
 ```
+
+`Procfile.dev`:
+
+```
+web: bin/rails server -u agoo -b 0.0.0.0 -p 3000
+worker: bundle exec sidekiq
+```
+
+O `-u agoo` é obrigatório — sem ele o Rails assume Puma, que não está no
+`Gemfile`.
 
 ## Variáveis de Ambiente
 
 ```bash
 # .env.example
 
-# Rails
-RAILS_ENV=production
-RAILS_MASTER_KEY=sua_master_key
-SECRET_KEY_BASE=sua_secret_key_base
-
 # Database
-DATABASE_URL=postgresql://clareo:senha@db:5432/clareo_production
-DATABASE_PASSWORD=senha_segura_aqui
+DATABASE_USERNAME=
+DATABASE_PASSWORD=
+DATABASE_HOST=localhost
 
 # Redis
-REDIS_URL=redis://redis:6379/0
+REDIS_URL=redis://localhost:6379/0
+
+# Rails
+RAILS_ENV=development
+SECRET_KEY_BASE=
+RAILS_MASTER_KEY=
 
 # JWT
-JWT_SECRET=minimo_32_bytes_aleatorios
+JWT_SECRET=
+JWT_EXPIRATION=86400
 
-# Binance
-BINANCE_API_KEY=
-BINANCE_API_SECRET=
-
-# TRON
-TRON_FULL_HOST=https://api.trongrid.io
-TRON_API_KEY=
-TRON_MASTER_WALLET_ADDRESS=
-TRON_MASTER_PRIVATE_KEY=
-
-# NOWPayments
-NOWPAYMENTS_API_KEY=
-NOWPAYMENTS_IPN_SECRET=
-
-# Encryption
-MASTER_ENCRYPTION_KEY=
+# Asaas
+ASAAS_API_KEY=
+ASAAS_ENVIRONMENT=sandbox
+ASAAS_WEBHOOK_URL=https://api.clareo.com.br/api/v1/webhooks/asaas
+ASAAS_WEBHOOK_TOKEN=
 
 # App
-APP_URL=https://api.clareo.com.br
-FRONTEND_URL=https://clareo.com.br
+FRONTEND_URL=http://localhost:3001
 ```
 
-## Deploy com Docker
+### Sobre `ASAAS_ENVIRONMENT`
+
+Nunca inferir o ambiente pela URL da API key. Chave de sandbox em produção é o
+erro mais caro possível aqui — a API key errada devolve 401, o que é bom. O
+perigo real é o oposto: rodar em produção com `sandbox` silenciosamente aceito.
+
+Variável explícita, valor validado no boot:
+
+```ruby
+# config/initializers/asaas.rb
+Rails.application.config.after_initialize do
+  valid = %w[sandbox production]
+  env = ENV.fetch("ASAAS_ENVIRONMENT")
+
+  raise "ASAAS_ENVIRONMENT deve ser sandbox ou production" unless valid.include?(env)
+
+  base = env == "production" ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3"
+
+  Rails.application.config.x.asaas = ActiveSupport::OrderedOptions.new
+  Rails.application.config.x.asaas.base_url = base
+  Rails.application.config.x.asaas.webhook_token = ENV.fetch("ASAAS_WEBHOOK_TOKEN")
+end
+```
+
+## Webhook: Endpoint Público
+
+O Asaas precisa alcançar a aplicação. Em desenvolvimento local:
 
 ```bash
-# 1. Clonar repositório
-git clone https://github.com/seu-usuario/clareo.git
-cd clareo
+# ngrok
+ngrok http 3000
 
-# 2. Configurar variáveis de ambiente
-cp .env.example .env
-# Editar .env com suas credenciais
-
-# 3. Gerar master key
-rails credentials:edit
-
-# 4. Build e iniciar
-docker-compose up -d
-
-# 5. Rodar migrações
-docker-compose exec api rails db:create db:migrate
-
-# 6. Verificar status
-docker-compose ps
-docker-compose logs -f api
+# ou Cloudflare Tunnel
+cloudflared tunnel --url http://localhost:3000
 ```
 
-## Deploy em Produção
+Configurar no painel do Asaas:
 
-### Opção 1: VPS (DigitalOcean, Linode, Vultr)
+- URL: `https://<tunnel>.ngrok.app/api/v1/webhooks/asaas`
+- `authToken`: mesmo valor de `ASAAS_WEBHOOK_TOKEN`
+- Eventos: `PAYMENT_RECEIVED`, `PAYMENT_SPLIT_DONE`,
+  `PAYMENT_SPLIT_DIVERGENCE_BLOCK`, `PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED`,
+  `TRANSFER_DONE`, `TRANSFER_FAILED`, `SUBSCRIPTION_*`, `ACCOUNT_STATUS_*`
+
+Configuração de sandbox e produção são **independentes**. Homologar em sandbox
+não configura produção.
+
+## Produção com Kamal
+
+O repositório tem `.kamal/` e `config/deploy.yml` configurados.
 
 ```bash
-# No servidor
-sudo apt update && sudo apt upgrade -y
-sudo apt install docker.io docker-compose -y
-
-# Clonar e configurar
-git clone https://github.com/seu-usuario/clareo.git
-cd clareo
-cp .env.example .env
-# Editar .env
-
-# Iniciar
-docker-compose up -d
-
-# Configurar nginx reverse proxy
-sudo apt install nginx -y
+kamal setup
+kamal deploy
+kamal logs -f app
+kamal console            # console Rails no servidor
+kamal dbc                # console psql
 ```
 
-### Opção 2: AWS/GCP/Azure
+### Checklist Antes do Primeiro Deploy
 
-- Usar ECS/EKS ou Cloud Run
-- RDS para PostgreSQL
-- ElastiCache para Redis
-- S3 para backups
+- [ ] `config/master.key` em cofre de segredo, nunca no repositório
+- [ ] `ASAAS_ENVIRONMENT=production`
+- [ ] `ASAAS_API_KEY` da **conta de produção**
+- [ ] `ASAAS_WEBHOOK_TOKEN` forte (32–255 chars), diferente da chave de API
+- [ ] URL de webhook em produção configurada no painel do Asaas
+- [ ] `SECRET_KEY_BASE` e `JWT_SECRET` gerados, não reaproveitados de dev
+- [ ] `force_ssl = true` em `config/environments/production.rb`
+- [ ] CORS limitado a `FRONTEND_URL` de produção
+- [ ] Backup automático testado **com restauração**
+- [ ] Alerta de webhook reprocessado > 5 vezes
+- [ ] Alerta de split bloqueado por divergência
 
-## Nginx Reverse Proxy
-
-```nginx
-# /etc/nginx/sites-available/clareo
-server {
-    listen 80;
-    server_name api.clareo.com.br;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name api.clareo.com.br;
-
-    ssl_certificate /etc/letsencrypt/live/api.clareo.com.br/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.clareo.com.br/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /cable {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-## SSL com Let's Encrypt
-
-```bash
-sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d api.clareo.com.br
-```
-
-## Monitoramento
-
-### Health Check
+## Health Check
 
 ```ruby
 # config/routes.rb
-get '/health', to: proc { [200, {}, ['OK']] }
+get "up" => "rails/health#show", as: :rails_health_check
 ```
 
-### Prometheus + Grafana
+`/up` **não toca o banco**. Uma queda de banco não deve tirar a API de load
+balancing — mas isso significa que `/up` não detecta queda de banco. Para isso,
+o readiness check do Thruster:
 
 ```ruby
-# Gemfile
-gem 'prometheus-client'
+# config/initializers/clareo.rb — dentro de after_initialize
+Rails.application.config.x.clareo.ready = lambda do
+  ActiveRecord::Base.connection.execute("SELECT 1")
+  true
+rescue StandardError
+  false
+end
+```
+
+## Sidekiq
+
+```yaml
+# config/sidekiq.yml
+:concurrency: 5
+:queues:
+  - [critical, 3]
+  - [webhooks, 2]
+  - [default, 1]
+```
+
+`webhooks` em fila separada com peso alto: atrasar confirmação de pagamento
+atrasa repasse, que é dinheiro de terceiro esperando.
+
+```ruby
+# app/jobs/process_asaas_webhook_job.rb
+class ProcessAsaasWebhookJob < ApplicationJob
+  queue_as :webhooks
+
+  retry_on ActiveRecord::Deadlocked, wait: :polynomially_longer, attempts: 5
+  discard_on ActiveRecord::RecordNotFound
+
+  def perform(provider_event_id)
+    event = WebhookEvent.find_by!(provider_event_id: provider_event_id)
+
+    # Já processado: não repete o efeito. O provedor entrega at least once.
+    return if event.already_processed?
+
+    event.start_processing!
+    Asaas::WebhookRouter.new.route(event)
+    event.processed!(at: Time.current)
+  rescue StandardError => error
+    event.failed!(message: error.message)
+    raise
+  end
+end
 ```
 
 ## Backup
 
 ```bash
-# Backup automático do PostgreSQL
-#!/bin/bash
-# backup.sh
+#!/usr/bin/env bash
+# script/backup.sh
+set -euo pipefail
 
-DATE=$(date +%Y%m%d_%H%M%S)
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="/backups"
+RETENTION_DAYS=30
 
-# Backup do banco
-docker-compose exec -T db pg_dump -U clareo clareo_production | gzip > $BACKUP_DIR/db_$DATE.sql.gz
+mkdir -p "$BACKUP_DIR"
 
-# Backup de uploads
-tar -czf $BACKUP_DIR/uploads_$DATE.tar.gz public/uploads
+# Dump do banco
+pg_dump "$DATABASE_URL" | gzip > "$BACKUP_DIR/db_$TIMESTAMP.sql.gz"
 
-# Manter apenas últimos 30 dias
-find $BACKUP_DIR -name "*.gz" -mtime +30 -delete
+# Compacta backup antigo
+find "$BACKUP_DIR" -name "db_*.sql.gz" -mtime +$RETENTION_DAYS -delete
+
+# Verifica integridade: um backup que nunca foi restaurado não é backup.
+if ! gzip -t "$BACKUP_DIR/db_$TIMESTAMP.sql.gz"; then
+  echo "backup corrompido: $BACKUP_DIR/db_$TIMESTAMP.sql.gz" >&2
+  exit 1
+fi
 ```
-
-### Cron Job
 
 ```bash
-# Adicionar ao crontab
-0 2 * * * /path/to/backup.sh
+# crontab -e
+0 2 * * * /caminho/para/script/backup.sh >> /var/log/clareo-backup.log 2>&1
 ```
+
+**Teste de restauração mensal.** Um backup nunca restaurado não é backup.
 
 ## Logs
 
 ```bash
-# Ver logs em tempo real
-docker-compose logs -f api
-docker-compose logs -f sidekiq
+docker compose logs -f api
+docker compose logs -f worker
 
-# Logs específicos
-docker-compose logs --tail=100 api
+# Filtrar eventos problemáticos
+docker compose logs worker | grep -E "PAYMENT_SPLIT_DIVERGENCE|TRANSFER_FAILED"
 ```
+
+### O Que Nunca Vai para Log
+
+```ruby
+# NUNCA
+Rails.logger.info("Subconta criada: #{response.body}")  # CONTÉM accessToken.apiKey
+Rails.logger.info("Webhook: #{payload.to_json}")          # pode conter dado pessoal
+
+# Sempre
+Rails.logger.info("Webhook #{id} recebido: #{event}")
+Rails.logger.info("Doação #{id} confirmada, líquido #{net}")
+```
+
+Ver [10-SEGURANCA.md](10-SEGURANCA.md).
+
+## Monitoramento
+
+| Métrica | Limite de alerta |
+|---------|------------------|
+| Eventos de webhook com `status = failed` | > 0 por 15 min |
+| `attempts` de um mesmo `provider_event_id` | > 5 |
+| Doações `split_blocked` | qualquer uma |
+| Instituições em `pending_approval` | > 60 dias |
+| Taxa efetiva por método | mudança > 1 p.p. do previsto |
+
+Os dois últimos vêm do período de avaliação regulatória do provedor: 10
+subcontas, R$ 2.000 por subconta, 60 dias. Estourar qualquer um desses limites
+**bloqueia** criação de subcontas e novas cobranças. Ver
+[16-INTEGRACAO-ASAAS.md](16-INTEGRACAO-ASAAS.md).
