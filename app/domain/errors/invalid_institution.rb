@@ -1,0 +1,2 @@
+class InvalidInstitution < DomainError
+end

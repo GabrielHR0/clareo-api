@@ -1,0 +1,2 @@
+class InvalidDonation < DomainError
+end

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Sobe a aplicação completa: infraestrutura, preparo do banco e bin/dev.
+#
+# Uso: bin/start
+#
+# Este projeto roda em WSL (Ubuntu). O servidor agoo é Linux/macOS only.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "==> subir infraestrutura"
+bin/infra start
+
+echo
+echo "==> preparar banco"
+bundle exec rails db:prepare
+bundle exec rails db:seed
+
+echo
+echo "==> iniciar API (agoo) e Sidekiq"
+exec bin/dev

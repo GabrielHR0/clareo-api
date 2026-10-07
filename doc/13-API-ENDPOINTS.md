@@ -1,18 +1,39 @@
 # Clareo — API Endpoints
 
-## Base URL
-
 ```
 https://api.clareo.com.br/api/v1
 ```
 
-## Autenticação
+## Convenções
 
-Todos os endpoints (exceto login/register) requerem header:
+Todos os endpoints, exceto login, cadastro e webhook, exigem:
 
 ```
 Authorization: Bearer <token>
 ```
+
+Formato de erro, uniforme em toda a API:
+
+```json
+{ "error": "Mensagem legível", "code": "identificador_estavel" }
+```
+
+Erros de domínio (`InvalidDonation`, `InvalidInstitution`, `InvalidSplit`,
+`InvalidSubscription`) mapeiam para `422`. Erro de autenticação, `401` ou `403`.
+Recurso inexistente, `404`.
+
+| Código | Uso |
+|--------|-----|
+| 200 | Sucesso |
+| 201 | Criado |
+| 400 | Requisição malformada |
+| 401 | Não autenticado ou token expirado |
+| 403 | Autenticado mas sem permissão, ou webhook com token inválido |
+| 404 | Não encontrado |
+| 409 | Conflito — cota de instituições excedida, referência duplicada |
+| 422 | Regra de domínio violada |
+| 429 | Rate limit excedido |
+| 500 | Erro interno |
 
 ---
 
@@ -20,43 +41,28 @@ Authorization: Bearer <token>
 
 ### POST /auth/login
 
-Realiza login e retorna token JWT.
-
-**Request:**
 ```json
-{
-  "email": "usuario@exemplo.com",
-  "password": "senha123"
-}
+{ "email": "joao@example.com", "password": "senha123" }
 ```
 
-**Response (200):**
+**201** / **200**
+
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiJ9...",
   "user": {
     "id": 1,
-    "email": "usuario@exemplo.com",
+    "email": "joao@example.com",
     "name": "João Silva",
-    "role": "donor"
+    "role": "institution_admin"
   }
 }
 ```
 
-**Response (401):**
-```json
-{
-  "error": "Email ou senha inválidos"
-}
-```
-
----
+**401** — `{" error": "Credenciais inválidas" }`
 
 ### POST /auth/register
 
-Registra novo usuário.
-
-**Request:**
 ```json
 {
   "email": "novo@exemplo.com",
@@ -66,18 +72,107 @@ Registra novo usuário.
 }
 ```
 
-**Response (201):**
+**201** — mesmo shape do login.
+
+Cria doador por padrão. Para administrador de instituição, criar a instituição
+depois e vincular.
+
+### POST /auth/logout
+
+Invalida o token no Redis. **204**.
+
+---
+
+## Institutions
+
+### POST /institutions
+
+Cadastra uma instituição. É o passo 1 do [Fluxo 1](04-FLUXOS.md#fluxo-1-onboarding-de-instituição-com-cnpj).
+
+**Com CNPJ** (caminho `:subaccount`, dispara criação de subconta):
+
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
-  "user": {
-    "id": 2,
-    "email": "novo@exemplo.com",
-    "name": "Maria Santos",
-    "role": "donor"
+  "legal_name": "Instituto Semear",
+  "trade_name": "Semear",
+  "cnpj": "66625514000140",
+  "legal_entity_kind": "ltda",
+  "declared_monthly_revenue": "50000.00",
+  "contact_email": "financeiro@institutosemear.org",
+  "mobile_phone": "11988887777",
+  "address": {
+    "street": "Rua Fernando Orlandi",
+    "number": "544",
+    "complement": "Sala 502",
+    "neighborhood": "Jardim Pedra Branca",
+    "postal_code": "14079-452",
+    "city": "Ribeirão Preto"
   }
 }
 ```
+
+`legal_entity_kind` ∈ `mei`, `ltda`, `mei_eire`, `association`. **`association`
+cobre ONGs.**
+
+**Sem CNPJ** (caminho `:pix_payout`):
+
+```json
+{
+  "legal_name": "Criador de Conteudo",
+  "pix_key": "financeiro@criador.com"
+}
+```
+
+**201**
+
+```json
+{
+  "id": 1,
+  "legal_name": "Instituto Semear",
+  "settlement_strategy": "subaccount",
+  "status": "pending_approval",
+  "registration_status": "pending",
+  "accepts_donations": false
+}
+```
+
+**422** — campo obrigatório ausente, CNPJ com dígito verificador inválido, CEP
+com tamanho errado, ou `pix_key` ausente no caminho `:pix_payout`.
+
+**409** — `{" error": "Plano permite apenas 1 instituição", "code": "quota_exceeded" }`
+
+### GET /institutions
+
+Lista as instituições do usuário autenticado. Query: `page`, `per_page`.
+
+### GET /institutions/:id
+
+**200**
+
+```json
+{
+  "id": 1,
+  "legal_name": "Instituto Semear",
+  "settlement_strategy": "subaccount",
+  "status": "active",
+  "registration_status": "approved",
+  "accepts_donations": true,
+  "withdraws_on_its_own": true,
+  "commercial_info_expires_on": "2027-05-05"
+}
+```
+
+`withdraws_on_its_own` diz ao front-end quem faz o saque: a própria instituição
+no caminho `:subaccount`, a plataforma no caminho `:pix_payout`.
+
+`commercial_info_expires_on` precisa de alerta — a revisão anual de informação
+comercial é exigência regulatória do provedor.
+
+### PATCH /institutions/:id
+
+Atualiza dados de contato e endereço.
+
+**Bloqueado:** `settlement_strategy` e `cnpj`. Trocá-los exige novo onboarding.
 
 ---
 
@@ -85,289 +180,289 @@ Registra novo usuário.
 
 ### POST /donations
 
-Cria nova doação.
-
-**Request:**
 ```json
 {
+  "institution_id": 1,
   "donor_name": "João Silva",
-  "donor_email": "joao@exemplo.com",
-  "amount_brl": 100.00,
+  "donor_email": "joao@example.com",
+  "amount_brl": "100.00",
   "payment_method": "pix"
 }
 ```
 
-**Response (201):**
+`payment_method` ∈ `pix`, `boleto`, `credit_card`.
+
+**201**
+
 ```json
 {
-  "id": 1,
+  "id": 42,
+  "reference": "don_1a2b3c",
   "status": "pending",
-  "amount_brl": 100.00,
-  "amount_usdt": 19.76,
-  "fee_amount": 2.00,
-  "payment_url": "https://nowpayments.io/payment?invoice_id=...",
-  "created_at": "2025-01-15T10:30:00Z"
+  "amount_brl": "100.00",
+  "payment_method": "pix",
+  "splits": [
+    { "recipient": "institution", "percentage": "94.0000" },
+    { "recipient": "platform", "percentage": "6.0000" }
+  ],
+  "payment": {
+    "invoice_url": "https://www.asaas.com/i/080225913252",
+    "bank_slip_url": null
+  }
 }
 ```
 
----
+`status: pending` significa que a cobrança foi criada, **não** que houve
+pagamento. Acompanhe pelo webhook.
+
+**422** — instituição não aceita doações, valor abaixo do mínimo da
+`SplitPolicy`, splits não somando 100%.
+
+**409** — `reference` duplicada.
 
 ### GET /donations/:id
 
-Busca doação por ID.
+**200**
 
-**Response (200):**
 ```json
 {
-  "id": 1,
-  "donor_name": "João Silva",
-  "donor_email": "joao@exemplo.com",
-  "amount_brl": 100.00,
-  "amount_usdt": 19.76,
-  "fee_amount": 2.00,
-  "status": "confirmed",
-  "tx_hash": "abc123...",
-  "payment_method": "pix",
-  "created_at": "2025-01-15T10:30:00Z",
-  "confirmed_at": "2025-01-15T10:32:00Z"
+  "id": 42,
+  "reference": "don_1a2b3c",
+  "status": "received",
+  "amount_brl": "100.00",
+  "net_amount_brl": "98.01",
+  "received_at": "2026-10-15T14:32:00Z",
+  "splits": [
+    {
+      "recipient": "institution",
+      "percentage": "94.0000",
+      "status": "done",
+      "total_value_brl": "92.13"
+    },
+    {
+      "recipient": "platform",
+      "percentage": "6.0000",
+      "status": "done",
+      "total_value_brl": "5.88"
+    }
+  ]
 }
 ```
 
----
+`net_amount_brl` e `total_value_brl` só existem depois do recebimento — antes
+disso o provedor ainda não aplicou as taxas.
 
 ### GET /donations
 
-Lista doações do usuário autenticado.
+Lista doações. Query: `institution_id`, `status`, `page`, `per_page`.
 
-**Query Params:**
-- `page` (default: 1)
-- `per_page` (default: 20, max: 100)
-- `status` (pending, confirmed, failed)
+`institution_id` é obrigatório para `institution_admin` e
+`platform_admin`; doadores veem apenas as próprias.
 
-**Response (200):**
-```json
-{
-  "donations": [...],
-  "meta": {
-    "current_page": 1,
-    "total_pages": 5,
-    "total_count": 100
-  }
-}
-```
+### GET /donations/:id/payment
+
+Dados da cobrança no provedor, para reconciliação. **Requer
+`platform_admin`** — expõe dado do provedor.
 
 ---
 
-## Wallets
+## Payouts
 
-### GET /wallets
+Só existe no caminho `:pix_payout`. No caminho `:subaccount` a instituição saca
+direto da própria subconta e este recurso não se aplica.
 
-Lista carteiras do usuário.
+### POST /payouts
 
-**Response (200):**
+```json
+{ "institution_id": 2, "donation_id": 42 }
+```
+
+Com `donation_id`, paga a parcela daquela doação. Sem ele, paga o saldo
+pendente acumulado da instituição.
+
+**202**
+
 ```json
 {
-  "wallets": [
-    {
-      "id": 1,
-      "address": "TSEHe6DwQUMfBkqXJsRCNFyU8d9p2qaxBZ",
-      "balance_usdt": 150.25,
-      "network": "tron",
-      "active": true,
-      "created_at": "2025-01-15T10:30:00Z"
-    }
-  ]
+  "id": 7,
+  "institution_id": 2,
+  "amount_brl": "92.13",
+  "pix_key": "financeiro@criador.com",
+  "status": "processing"
 }
 ```
 
----
+**422** — instituição no caminho `:subaccount`, ou sem valor pendente.
 
-### POST /wallets
+**409** — já existe payout para `(donation_id, institution_id)`.
 
-Cria nova carteira.
+**422** — saldo da conta insuficiente para cobrir a transferência.
 
-**Response (201):**
+### GET /payouts/:id
+
+**200**
+
 ```json
 {
-  "id": 2,
-  "address": "TnewAddress...",
-  "balance_usdt": 0.0,
-  "network": "tron",
-  "active": true,
-  "created_at": "2025-01-15T11:00:00Z"
-}
-```
-
----
-
-## Withdrawals
-
-### POST /withdrawals
-
-Solicita saque.
-
-**Request:**
-```json
-{
-  "wallet_id": 1,
-  "amount_brl": 50.00,
-  "pix_key": "usuario@exemplo.com"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 1,
-  "status": "pending",
-  "amount_brl": 50.00,
-  "amount_usdt": 9.88,
-  "pix_key": "usuario@exemplo.com",
-  "created_at": "2025-01-15T12:00:00Z"
-}
-```
-
----
-
-### GET /withdrawals/:id
-
-Busca saque por ID.
-
-**Response (200):**
-```json
-{
-  "id": 1,
+  "id": 7,
   "status": "completed",
-  "amount_brl": 50.00,
-  "amount_usdt": 9.88,
-  "tx_hash": "def456...",
-  "pix_key": "usuario@exemplo.com",
-  "created_at": "2025-01-15T12:00:00Z",
-  "completed_at": "2025-01-15T12:05:00Z"
+  "amount_brl": "92.13",
+  "pix_key": "financeiro@criador.com",
+  "completed_at": "2026-10-16T09:15:00Z",
+  "failure_reason": null
 }
+```
+
+### GET /payouts
+
+Query: `institution_id`, `status`, `page`, `per_page`.
+
+### GET /institutions/:id/payoutable
+
+Quanto a instituição tem a receber e ainda não recebeu. Alimenta o botão de
+solicitar saque no front-end.
+
+**200**
+
+```json
+{ "institution_id": 2, "pending_amount_brl": "271.44", "donations_pending": 3 }
 ```
 
 ---
 
-### GET /withdrawals
+## Subscriptions
 
-Lista saques do usuário.
+Uma assinatura ativa por usuário. O plano limita a quantidade de instituições,
+não a taxa de split.
 
-**Query Params:**
-- `page` (default: 1)
-- `per_page` (default: 20, max: 100)
-- `status` (pending, processing, completed, failed)
+### GET /plans
 
-**Response (200):**
+**200**
+
+```json
+[
+  { "code": "free", "name": "Básico", "price_brl": "0.00", "max_institutions": 1 },
+  { "code": "pro", "name": "Pro", "price_brl": "97.00", "max_institutions": 5 },
+  { "code": "enterprise", "name": "Enterprise", "price_brl": "497.00", "max_institutions": null }
+]
+```
+
+`max_institutions: null` significa ilimitado.
+
+### GET /subscriptions/current
+
+**200**
+
 ```json
 {
-  "withdrawals": [...],
-  "meta": {
-    "current_page": 1,
-    "total_pages": 2,
-    "total_count": 35
-  }
+  "id": 3,
+  "plan": { "code": "pro", "name": "Pro", "price_brl": "97.00" },
+  "status": "active",
+  "institutions_used": 2,
+  "institutions_remaining": 3
 }
 ```
 
----
+### POST /subscriptions
 
-## Yield
-
-### GET /yield/snapshots
-
-Lista snapshots de rendimento.
-
-**Query Params:**
-- `wallet_id` (obrigatório)
-- `start_date` (ISO 8601)
-- `end_date` (ISO 8601)
-
-**Response (200):**
 ```json
-{
-  "snapshots": [
-    {
-      "id": 1,
-      "balance": 150.25,
-      "apy": 1.35,
-      "earned": 0.56,
-      "recorded_at": "2025-01-15T00:00:00Z"
-    }
-  ]
-}
+{ "plan_code": "pro" }
 ```
 
----
+**201**
 
-### GET /yield/summary
+**409** — já existe assinatura ativa. Uma por usuário.
 
-Retorna resumo de rendimento.
+### DELETE /subscriptions/:id
 
-**Response (200):**
-```json
-{
-  "total_balance": 150.25,
-  "current_apy": 1.35,
-  "total_earned": 12.50,
-  "earned_today": 0.56,
-  "earned_this_month": 5.25
-}
-```
+Cancela. Instituições existentes continuam operando, mas novas instituições
+ficam bloqueadas. **204**.
 
 ---
 
 ## Webhooks
 
-### POST /webhooks/nowpayments
+### POST /webhooks/asaas
 
-Webhook do NOWPayments (IPN).
+Endpoint público, **sem** autenticação JWT. A autenticação é o header
+`asaas-access-token`, comparado com o token configurado no painel do provedor.
 
-**Headers:**
-- `x-nowpayments-sig`: Assinatura HMAC-SHA512
+**Sequência obrigatória:**
 
-**Request:**
+```
+validar token → persistir → responder 200 → processar em background
+```
+
+**200** — recebido e persistido, ou duplicado já persistido.
+
+**401** — token ausente ou inválido. Nada é persistido.
+
+**4xx / 5xx** — o provedor tenta de novo. Após **15 falhas consecutivas** a
+fila é interrompida. Por isso o processamento vai para o Sidekiq e a resposta é
+imediata.
+
+### GET /webhooks/asaas/events
+
+Eventos recebidos, para operação. **Requer `platform_admin`**.
+
+Query: `status`, `event`, `page`, `per_page`.
+
 ```json
 {
-  "id": 12345,
-  "order_id": "donation_abc123",
-  "payment_status": "finished",
-  "price_amount": 100.00,
-  "price_currency": "brl",
-  "amount": 19.76,
-  "amount_currency": "usdttrc20"
+  "webhook_events": [
+    {
+      "provider_event_id": "evt_05b708f961d739ea7eba7e4db318f621",
+      "event": "PAYMENT_RECEIVED",
+      "resource_type": "payment",
+      "resource_id": "pay_080225913252",
+      "status": "processed",
+      "attempts": 1,
+      "created_at": "2026-10-15T14:31:58Z"
+    }
+  ]
 }
 ```
 
-**Response (200):**
+`status: failed` com `attempts: 5` é a fila que precisa de atenção.
+
+### POST /webhooks/asaas/reprocess
+
+Reprocessa um evento com erro. **Requer `platform_admin`.**
+
 ```json
-{
-  "status": "ok"
-}
+{ "webhook_event_id": 88 }
 ```
+
+Reprocessar revalida o estado atual da entidade antes de agir — um evento antigo
+pode encontrar a entidade já atualizada.
+
+**202**
 
 ---
 
-## Erros
+## Admin
 
-### Formato padrão
+### GET /admin/institutions
 
-```json
-{
-  "error": "Mensagem de erro"
-}
-```
+Todas as instituições, qualquer status. **Requer `platform_admin`**.
 
-### Códigos de status
+### GET /admin/reconciliation
 
-| Código | Descrição |
-|--------|-----------|
-| 200 | Sucesso |
-| 201 | Criado |
-| 400 | Requisição inválida |
-| 401 | Não autenticado |
-| 403 | Não autorizado |
-| 404 | Não encontrado |
-| 422 | Entidade não processável |
-| 429 | Rate limit excedido |
-| 500 | Erro interno |
+Divergências entre estado local e estado do provedor. **Requer
+`platform_admin`**.
+
+Aponta doações com `reference` local sem `asaas_payment_id`, splits pendentes há
+mais de 48 horas, e instituições em `pending_approval` há mais de 60 dias — o
+limite do período de avaliação regulatória.
+
+---
+
+## Health
+
+### GET /up
+
+Sem autenticação. **200** quando a aplicação sobe. **500** caso contrário.
+
+Usado por balanceador e por monitoramento de disponibilidade. Não toca o banco
+de dados de propósito: uma queda de banco não deve tirar a API de load
+balancing.
