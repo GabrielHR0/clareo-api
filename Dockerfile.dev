@@ -1,35 +1,44 @@
 # syntax=docker/dockerfile:1
-
-# Desenvolvimento — inclui todas as gems, debug tools, etc.
+# Imagem de desenvolvimento e teste. O Dockerfile da raiz é de produção e
+# instala sem os grupos development/test, o que não serve para rspec nem
+# rubocop.
+#
+# Aqui o bundle é completo, incluindo o agoo, que é nativo de Linux/macOS. É
+# este container que substitui o WSL para rodar a suíte.
 ARG RUBY_VERSION=4.0.6
 FROM docker.io/library/ruby:$RUBY_VERSION-slim
 
 WORKDIR /rails
 
-# Pacotes base
+# build-essential e libpq-dev para as extensões nativas: pg, agoo, bcrypt, jemalloc.
+# postgresql-client para o pg_isready do bin/infra.
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
-      curl \
-      libjemalloc2 \
-      postgresql-client \
-      build-essential \
-      git \
-      libpq-dev \
-      libyaml-dev \
-      pkg-config && \
+      build-essential git libpq-dev libyaml-dev pkg-config postgresql-client curl && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Dev: sem BUNDLE_WITHOUT, sem BUNDLE_DEPLOYMENT
-ENV RAILS_ENV="development" \
-    BUNDLE_PATH="/usr/local/bundle" \
-    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+# O bundle vai para fora do worktree, num volume nomeado. Assim a suite roda sem
+# recompilar as extensoes nativas a cada execucao.
+ENV BUNDLE_PATH=/usr/local/bundle \
+    BUNDLE_JOBS=4 \
+    BUNDLE_RETRY=3
 
-# Instala gems (todas, incluindo development/test)
 COPY Gemfile Gemfile.lock ./
 RUN bundle install
 
-# Copia o código da aplicação
 COPY . .
 
+# Nao roda como root: a imagem de producao tambem nao roda. O chmod no bundle e
+# apesar do chown: o volume nomeado em /usr/local/bundle e inicializado a partir
+# da imagem, mas o Docker Desktop nao preserva sempre o dono, e ai o processo
+# roda como uid 1000 sem permissao de escrita. a+rwX nao da ao container nada
+# que ele ja nao tenha.
+RUN groupadd --system --gid 1000 rails && \
+    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
+    chown -R rails:rails /rails /usr/local/bundle && \
+    chmod -R a+rwX /usr/local/bundle
+USER 1000:1000
+
 EXPOSE 3000
-CMD ["bin/dev"]
+ENTRYPOINT []
+CMD ["bundle", "exec", "rspec"]
