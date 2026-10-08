@@ -52,21 +52,31 @@ class DonationSplit
     Money.build(net_amount).percentage_of(percentage)
   end
 
+  # A blocked split can still be confirmed once the value divergence is
+  # resolved, mirroring Donation#confirm_receipt!, which also accepts
+  # split_blocked. Cancelled and done are final.
   def mark_done!(total_value:, asaas_split_id: nil)
-    @status = :done
+    transition_to!(%i[pending blocked], :done)
     @total_value = Money.build(total_value)
     @asaas_split_id = asaas_split_id
     self
   end
 
   def cancel!(reason: :manual_cancellation)
-    @status = :cancelled
+    unless CANCELLATION_REASONS.include?(reason)
+      raise InvalidSplit, "reason must be one of #{CANCELLATION_REASONS.join(', ')}"
+    end
+
+    transition_to!(%i[pending blocked], :cancelled)
     @cancellation_reason = reason
     self
   end
 
+  # Blocking is specific to a value divergence: the provider reported a split
+  # total that does not match what was expected. A settled split can be blocked
+  # for that reason, a cancelled one cannot be reopened.
   def block!
-    @status = :blocked
+    transition_to!(%i[pending done], :blocked)
     @cancellation_reason = :value_divergence_block
     self
   end
@@ -106,5 +116,13 @@ class DonationSplit
     if recipient == :platform && institution
       raise InvalidSplit, "platform split stays on the issuing account and cannot have an institution"
     end
+  end
+
+  def transition_to!(allowed_from, target)
+    unless allowed_from.include?(status)
+      raise InvalidSplit, "cannot move split from #{status} to #{target}"
+    end
+
+    @status = target
   end
 end
