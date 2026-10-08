@@ -4,8 +4,12 @@ source "https://rubygems.org"
 gem "rails", "~> 8.1.3"
 # Use postgresql as the database for Active Record
 gem "pg", "~> 1.1"
-# Use the Kino web server (Rust + Ractors) [https://github.com/yaroslav/kino]
-# gem "puma" # removido - usando Kino
+# Agoo is a Rack-compatible HTTP server written in C. It is Linux and macOS
+# only, so this app cannot be bundled on Windows: run it in WSL.
+gem "agoo"
+
+# Rails 8 ships no rackup binstub; Thruster needs one to front Agoo in production.
+gem "rackup"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
@@ -42,8 +46,6 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 end
-
-gem "kino", "~> 0.6.0"
 
 gem "rspec-rails", "~> 8.0", groups: [:development, :test]
 

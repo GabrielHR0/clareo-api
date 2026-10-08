@@ -1,7 +1,5 @@
 require_relative "boot"
 
-Dotenv.load(".env")
-
 require "rails"
 # Pick the frameworks you want:
 require "active_model/railtie"
@@ -29,6 +27,17 @@ module Clareo
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
+
+    # Rails makes every app/* directory its own autoload root, which would turn
+    # app/domain/entities into the Entities namespace (Entities::Donation) and
+    # app/ports/output into Output. Adding the layers as roots keeps the
+    # ubiquitous names flat: Donation, Money, PaymentGateway.
+    layer_roots = Dir[config.root.join("app/domain/*")] +
+      Dir[config.root.join("app/ports/output")] +
+      Dir[config.root.join("app/adapters/secondary")]
+
+    config.autoload_paths += layer_roots
+    config.eager_load_paths += layer_roots
 
     # Configuration for the application, engines, and railties goes here.
     #
