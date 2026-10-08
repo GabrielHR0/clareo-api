@@ -10,7 +10,7 @@
 | `institution_admin` | instituições que administra |
 | `platform_admin` | tudo, mais endpoints operacionais |
 
-Uma assinatura por usuário; um usuário administra de 1 a N instituições.
+Uma assinatura por instituição. Um usuário administra de 1 a N instituições, cada uma com o seu plano.
 Papel é do **usuário**, não da instituição.
 
 ## Variáveis

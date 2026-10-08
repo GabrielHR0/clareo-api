@@ -75,8 +75,8 @@ app/
 │   │   ├── donation_split.rb        # uma perna do rateio
 │   │   ├── payout.rb                # repasse por Pix
 │   │   ├── webhook_event.rb         # idempotência de webhook
-│   │   ├── plan.rb                  # plano, com max_institutions
-│   │   └── subscription.rb          # 1 por usuário
+│   │   ├── plan.rb                  # plano, sem cota: assinatura e por instituicao
+│   │   └── subscription.rb          # 1 por instituicao
 │   ├── services/
 │   │   ├── split_policy.rb          # tabela de faixas (dado, não código)
 │   │   └── settlement_plan.rb       # instituição + valor -> splits
