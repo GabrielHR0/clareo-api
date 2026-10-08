@@ -5,6 +5,12 @@ updates:
   schedule:
     interval: weekly
   open-pull-requests-limit: 10
+  ignore:
+    # O kino saiu do projeto: o servidor web agora e o agoo (ver Gemfile).
+    # Esta entrada existe porque o Dependabot le o branch padrao, que ainda
+    # tem o kino no Gemfile enquanto o develop nao foi mergeado para o main.
+    # Remover esta linha depois que o main receber o merge do develop.
+    - dependency-name: "kino"
 - package-ecosystem: github-actions
   directory: "/"
   schedule:
