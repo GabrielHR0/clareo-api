@@ -4,18 +4,22 @@ class Institution
   STATUSES = %i[draft pending_approval active blocked].freeze
   REGISTRATION_STATUSES = %i[unregistered pending approved rejected].freeze
 
-  attr_reader :id, :legal_name, :trade_name, :cnpj, :legal_entity_kind,
-              :declared_monthly_revenue, :contact_email, :mobile_phone,
-              :address, :pix_key, :settlement_strategy, :asaas_account_id,
-              :asaas_wallet_id, :registration_status, :status
+  attr_reader :id, :user_id, :legal_name, :trade_name, :cnpj,
+              :legal_entity_kind, :declared_monthly_revenue, :contact_email,
+              :mobile_phone, :address, :pix_key, :settlement_strategy,
+              :asaas_account_id, :asaas_wallet_id, :registration_status, :status
 
-  def initialize(legal_name:, settlement_strategy:, id: nil, cnpj: nil,
-                 legal_entity_kind: nil, declared_monthly_revenue: nil,
+  # user_id é o dono: quem abriu e quem administra. Não é a assinatura — a
+  # assinatura é desta instituição e vive em Subscription, uma por tenant.
+  # Um usuário pode ter várias instituições, cada uma com o seu plano.
+  def initialize(legal_name:, settlement_strategy:, user_id: nil, id: nil,
+                 cnpj: nil, legal_entity_kind: nil, declared_monthly_revenue: nil,
                  contact_email: nil, mobile_phone: nil, address: nil,
                  pix_key: nil, trade_name: nil, asaas_account_id: nil,
                  asaas_wallet_id: nil, registration_status: :unregistered,
                  status: :draft)
     @id = id
+    @user_id = user_id
     @legal_name = legal_name
     @trade_name = trade_name
     @cnpj = wrap_cpf_cnpj(cnpj)
@@ -114,75 +118,80 @@ class Institution
 
   private
 
-  def validate!
-    validate_strategy!
-    validate_status!
-    validate_registration_status!
-    validate_subaccount_requirements!
-    validate_pix_payout_requirements!
-  end
-
-  def validate_strategy!
-    return if SETTLEMENT_STRATEGIES.include?(settlement_strategy)
-
-    raise InvalidInstitution, "settlement strategy must be one of #{SETTLEMENT_STRATEGIES.join(', ')}"
-  end
-
-  def validate_status!
-    raise InvalidInstitution, "status must be one of #{STATUSES.join(', ')}" unless STATUSES.include?(status)
-  end
-
-  def validate_registration_status!
-    return if REGISTRATION_STATUSES.include?(registration_status)
-
-    raise InvalidInstitution, "registration status must be one of #{REGISTRATION_STATUSES.join(', ')}"
-  end
-
-  # The provider only accepts legal entities with a declared monthly revenue and
-  # a complete address. Those are business facts, so they are required at the
-  # domain level rather than discovered as a 400 later.
-  def validate_subaccount_requirements!
-    return unless subaccount?
-
-    require_field!(cnpj, "cnpj")
-    require_field!(legal_entity_kind, "legal entity kind")
-    require_field!(declared_monthly_revenue, "declared monthly revenue")
-    require_field!(contact_email, "contact email")
-    require_field!(mobile_phone, "mobile phone")
-    require_field!(address, "address")
-
-    return if LEGAL_ENTITY_KINDS.include?(legal_entity_kind)
-
-    raise InvalidInstitution, "legal entity kind must be one of #{LEGAL_ENTITY_KINDS.join(', ')}"
-  end
-
-  def validate_pix_payout_requirements!
-    return unless pix_payout?
-
-    require_field!(pix_key, "pix key")
-  end
-
-  def require_field!(value, field)
-    raise InvalidInstitution, "#{field} is required" if value.nil?
-  end
-
-  def transition_to!(allowed_from, target)
-    unless allowed_from.include?(status)
-      raise InvalidInstitution, "cannot move institution from #{status} to #{target}"
+    def validate!
+      validate_owner!
+      validate_strategy!
+      validate_status!
+      validate_registration_status!
+      validate_subaccount_requirements!
+      validate_pix_payout_requirements!
     end
 
-    @status = target
-  end
+    def validate_owner!
+      raise InvalidInstitution, "owner is required" if user_id.nil?
+    end
 
-  def wrap_cpf_cnpj(value)
-    value.nil? ? nil : CpfCnpj.build(value)
-  end
+    def validate_strategy!
+      return if SETTLEMENT_STRATEGIES.include?(settlement_strategy)
 
-  def wrap_money(value)
-    value.nil? ? nil : Money.build(value)
-  end
+      raise InvalidInstitution, "settlement strategy must be one of #{SETTLEMENT_STRATEGIES.join(', ')}"
+    end
 
-  def wrap_pix_key(value)
-    value.nil? ? nil : PixKey.build(value)
-  end
+    def validate_status!
+      raise InvalidInstitution, "status must be one of #{STATUSES.join(', ')}" unless STATUSES.include?(status)
+    end
+
+    def validate_registration_status!
+      return if REGISTRATION_STATUSES.include?(registration_status)
+
+      raise InvalidInstitution, "registration status must be one of #{REGISTRATION_STATUSES.join(', ')}"
+    end
+
+    # The provider only accepts legal entities with a declared monthly revenue and
+    # a complete address. Those are business facts, so they are required at the
+    # domain level rather than discovered as a 400 later.
+    def validate_subaccount_requirements!
+      return unless subaccount?
+
+      require_field!(cnpj, "cnpj")
+      require_field!(legal_entity_kind, "legal entity kind")
+      require_field!(declared_monthly_revenue, "declared monthly revenue")
+      require_field!(contact_email, "contact email")
+      require_field!(mobile_phone, "mobile phone")
+      require_field!(address, "address")
+
+      return if LEGAL_ENTITY_KINDS.include?(legal_entity_kind)
+
+      raise InvalidInstitution, "legal entity kind must be one of #{LEGAL_ENTITY_KINDS.join(', ')}"
+    end
+
+    def validate_pix_payout_requirements!
+      return unless pix_payout?
+
+      require_field!(pix_key, "pix key")
+    end
+
+    def require_field!(value, field)
+      raise InvalidInstitution, "#{field} is required" if value.nil?
+    end
+
+    def transition_to!(allowed_from, target)
+      unless allowed_from.include?(status)
+        raise InvalidInstitution, "cannot move institution from #{status} to #{target}"
+      end
+
+      @status = target
+    end
+
+    def wrap_cpf_cnpj(value)
+      value.nil? ? nil : CpfCnpj.build(value)
+    end
+
+    def wrap_money(value)
+      value.nil? ? nil : Money.build(value)
+    end
+
+    def wrap_pix_key(value)
+      value.nil? ? nil : PixKey.build(value)
+    end
 end

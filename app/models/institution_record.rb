@@ -17,6 +17,13 @@ class InstitutionRecord < ApplicationRecord
     inverse_of: :institution_record,
     dependent: :restrict_with_error
 
+  # Uma assinatura por instituição: é ela que diz o que o plano paga.
+  has_one :subscription_record,
+    class_name: "SubscriptionRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
   SETTLEMENT_STRATEGIES = %w[subaccount pix_payout].freeze
   STATUSES = %w[draft pending_approval active blocked].freeze
   REGISTRATION_STATUSES = %w[unregistered pending approved rejected].freeze

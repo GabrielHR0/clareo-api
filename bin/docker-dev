@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Roda um comando do projeto dentro do container de desenvolvimento, que tem
+# Ruby 4.0.6 e o bundle completo, incluindo o agoo.
+#
+# O bundle vive num volume nomeado, entao as extensoes nativas (pg, agoo,
+# bcrypt) compilam uma vez so. O codigo entra por bind mount: editar arquivo
+# na maquina e o container ve na hora.
+#
+# O Postgres e o Redis do WSL nao estao na rede do container, entao o host do
+# banco vira host.docker.internal.
+#
+# Uso:
+#   bin/docker-dev rspec
+#   bin/docker-dev rubocop
+#   bin/docker-dev rails db:migrate
+#   bin/docker-dev sh -c "bundle exec rails server -u agoo"
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+IMAGE="${CLAREO_DEV_IMAGE:-clareo-dev:4.0.6}"
+# Mesmo volume que o compose usa: os gems sao compilados uma vez e serves tanto
+# para bin/docker-dev quanto para docker compose up.
+BUNDLE_VOLUME="${CLAREO_BUNDLE_VOLUME:-clareo_bundle}"
+
+if [ $# -eq 0 ]; then
+  echo "uso: bin/docker-dev <comando> [args...]" >&2
+  echo "exemplos:" >&2
+  echo "  bin/docker-dev rspec" >&2
+  echo "  bin/docker-dev rubocop" >&2
+  echo "  bin/docker-dev rails db:migrate" >&2
+  exit 64
+fi
+
+# O WSL tem um /usr/bin/docker proprio, que fala com o daemon do Linux e nao
+# alcança o Docker Desktop. Docker Desktop nao expoe socket unix, entao ele
+# sempre falha. Aqui escolhe o cliente que realmente fala com o daemon: o
+# docker.exe do Windows quando ele existe.
+DOCKER=""
+for candidate in docker.exe docker; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" info >/dev/null 2>&1; then
+    DOCKER="$candidate"
+    break
+  fi
+done
+
+if [ -z "$DOCKER" ]; then
+  echo "nao achei um cliente docker que fale com o daemon." >&2
+  echo "o Docker Desktop esta aberto?" >&2
+  exit 69
+fi
+
+# O docker.exe do Windows nao entende /mnt/c/... nem /c/...; precisa do caminho
+# Windows. Git Bash usa cygpath, WSL usa wslpath, e pode ser que nenhum dos dois
+# esteja disponivel se o script rodar em outro lugar.
+MOUNT_ROOT="$ROOT"
+if [ "$DOCKER" = "docker.exe" ]; then
+  if command -v wslpath >/dev/null 2>&1; then
+    MOUNT_ROOT="$(wslpath -w "$ROOT")"
+  elif command -v cygpath >/dev/null 2>&1; then
+    MOUNT_ROOT="$(cygpath -w "$ROOT")"
+  else
+    echo "wslpath e cygpath indisponiveis: nao sei converter \$ROOT para o" >&2
+    echo "caminho que o docker.exe do Windows entende." >&2
+    exit 64
+  fi
+fi
+
+if ! "$DOCKER" image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo "imagem $IMAGE nao existe; construindo (a primeira vez leva alguns minutos)..." >&2
+  "$DOCKER" build -f "$ROOT/Dockerfile.dev" -t "$IMAGE" "$ROOT"
+fi
+
+# Os binstubs (bin/rspec, bin/rubocop) so existem depois do bundle install, e
+# a imagem nao os cria. Wrappe em bundle exec para que `docker-dev rspec`
+# funcione igual `bin/rspec` na maquina.
+case "$1" in
+  bundle|ruby|sh|bash|-* ) ;;
+  rspec|rubocop|rails|rake|brakeman|bundler-audit|thrust|kamal)
+    set -- bundle exec "$@" ;;
+esac
+
+# O build ja copiou o codigo para dentro da imagem, mas o bind mount tem
+# precedencia e e o que voce esta editando.
+exec "$DOCKER" run --rm \
+  --add-host=host.docker.internal:host-gateway \
+  -v "$MOUNT_ROOT:/rails" \
+  -v "$BUNDLE_VOLUME:/usr/local/bundle" \
+  -w /rails \
+  -e RAILS_ENV="${RAILS_ENV:-development}" \
+  -e DATABASE_HOST=host.docker.internal \
+  -e DATABASE_PORT="${DATABASE_PORT:-5432}" \
+  "$IMAGE" "$@"

@@ -1,13 +1,16 @@
+# A assinatura pertence à instituição, não ao usuário. Um usuário pode abrir
+# várias instituições e paga um plano por cada uma: o plano é o tenant, e por
+# isso o acesso à transparência se resolve em uma linha, sem feature flag.
 class Subscription
   STATUSES = %i[active past_due cancelled expired].freeze
 
-  attr_reader :id, :user_id, :plan, :provider_subscription_id, :status,
+  attr_reader :id, :institution_id, :plan, :provider_subscription_id, :status,
               :current_period_ends_at, :cancelled_at
 
-  def initialize(user_id:, plan:, id: nil, provider_subscription_id: nil,
+  def initialize(institution_id:, plan:, id: nil, provider_subscription_id: nil,
                  status: :active, current_period_ends_at: nil, cancelled_at: nil)
     @id = id
-    @user_id = user_id
+    @institution_id = institution_id
     @plan = plan
     @provider_subscription_id = provider_subscription_id
     @status = status
@@ -17,20 +20,15 @@ class Subscription
     validate!
   end
 
-  # A delinquent or cancelled subscription does not entitle the user to register
-  # new institutions. Existing institutions keep running.
+  # Uma assinatura inadimplente ou cancelada não tira a instituição do ar: ela
+  # continua recebendo, porque o dinheiro de quem já doou está com ela.
+  #
+  # Esta é também a resposta do gate de transparência. Como a assinatura é por
+  # instituição, não há feature flag nem contagem a consultar: publicar exige
+  # assinatura ativa, e nada além disso. Institution#accepts_donations? responde
+  # a outra pergunta, e continua valendo separadamente.
   def in_good_standing?
     status == :active
-  end
-
-  def allows_another_institution?(institution_count)
-    in_good_standing? && plan.allows?(institution_count)
-  end
-
-  def remaining_institution_slots(institution_count)
-    return nil unless in_good_standing?
-
-    plan.remaining_slots(institution_count)
   end
 
   # Cancelling is only meaningful while the provider can still charge. Once
@@ -62,17 +60,17 @@ class Subscription
 
   private
 
-  def validate!
-    raise InvalidSubscription, "user is required" if user_id.nil?
-    raise InvalidSubscription, "plan is required" if plan.nil?
-    raise InvalidSubscription, "status must be one of #{STATUSES.join(', ')}" unless STATUSES.include?(status)
-  end
-
-  def transition_to!(allowed_from, target)
-    unless allowed_from.include?(status)
-      raise InvalidSubscription, "cannot move subscription from #{status} to #{target}"
+    def validate!
+      raise InvalidSubscription, "institution is required" if institution_id.nil?
+      raise InvalidSubscription, "plan is required" if plan.nil?
+      raise InvalidSubscription, "status must be one of #{STATUSES.join(', ')}" unless STATUSES.include?(status)
     end
 
-    @status = target
-  end
+    def transition_to!(allowed_from, target)
+      unless allowed_from.include?(status)
+        raise InvalidSubscription, "cannot move subscription from #{status} to #{target}"
+      end
+
+      @status = target
+    end
 end

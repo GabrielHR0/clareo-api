@@ -1,52 +1,109 @@
+# Infraestrutura e aplicacao de desenvolvimento, tudo em Docker.
+#
+# As credenciais vem do .env por interpolacao, para o compose e o app lerem a
+# mesma fonte. O que o compose precisa sobrescrever sao os hosts: dentro da rede
+# do compose o banco e "postgres" e o redis e "redis", nao 127.0.0.1.
+#
+# config/database.yml le DATABASE_HOST/USERNAME/PASSWORD/PORT e ignora
+# DATABASE_URL, entao o compose passa as variaveis soltas de proposito.
+#
+# Uso: docker compose up -d, depois docker compose logs -f web
+
+name: clareo
+
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: teste
-      POSTGRES_PASSWORD: clareo_dev_2024
+      POSTGRES_USER: ${DATABASE_USERNAME:-teste}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?defina DATABASE_PASSWORD no .env}
+      # O banco de manutencao: os dois bancos do projeto nascem no init abaixo.
+      POSTGRES_DB: postgres
+      DEV_DB: ${DATABASE_NAME:-clareo_development}
+      TEST_DB: ${DATABASE_NAME_TEST:-clareo_test}
     volumes:
       - pg_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     ports:
-      - "5432:5432"
+      # 5433 e nao 5432: o Postgres do WSL ja ocupa 5432 na maquina. Serve para
+      # inspecionar com psql sem derrubar a infraestrutura do bin/infra.
+      - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-teste} -d postgres" ]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 
   redis:
-    image: valkey/valkey:8
+    image: redis:7
     ports:
-      - "6379:6379"
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 
   web:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    # Tag explicita: sem ela o buildx tenta nomear as duas builds (web e sidekiq
+    # usam o mesmo contexto) e falha com "image already exists".
+    image: ${CLAREO_DEV_IMAGE:-clareo-dev:4.0.6}
+    command: bundle exec rails server -u agoo -b 0.0.0.0 -p 3000
+    entrypoint: [ "/rails/docker/entrypoint-dev.sh" ]
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgres://teste:clareo_dev_2024@postgres:5432/clareo_development
-      REDIS_URL: redis://redis:6379/0
       RAILS_ENV: development
+      # Sobrescreve o 127.0.0.1 do .env: dentro do compose o host e o servico.
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-teste}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?defina DATABASE_PASSWORD no .env}
+      DATABASE_NAME: ${DATABASE_NAME:-clareo_development}
+      DATABASE_NAME_TEST: ${DATABASE_NAME_TEST:-clareo_test}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - .:/rails
-      - bundle_cache:/usr/local/bundle
+      - bundle:/usr/local/bundle
+    stdin_open: true
+    tty: true
 
   sidekiq:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+    # Mesma imagem do web, sem build: o build acontece uma vez. Manter os dois
+    # com build faz o buildx tentar criar a mesma imagem duas vezes.
+    image: ${CLAREO_DEV_IMAGE:-clareo-dev:4.0.6}
     command: bundle exec sidekiq
+    entrypoint: [ "/rails/docker/entrypoint-dev.sh" ]
     environment:
-      DATABASE_URL: postgres://teste:clareo_dev_2024@postgres:5432/clareo_development
-      REDIS_URL: redis://redis:6379/0
       RAILS_ENV: development
+      RUN_MIGRATIONS: "0"
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-teste}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?defina DATABASE_PASSWORD no .env}
+      DATABASE_NAME: ${DATABASE_NAME:-clareo_development}
+      DATABASE_NAME_TEST: ${DATABASE_NAME_TEST:-clareo_test}
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - .:/rails
-      - bundle_cache:/usr/local/bundle
+      - bundle:/usr/local/bundle
 
 volumes:
   pg_data:
-  bundle_cache:
+  redis_data:
+  bundle:

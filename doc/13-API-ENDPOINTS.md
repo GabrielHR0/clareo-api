@@ -332,8 +332,9 @@ solicitar saque no front-end.
 
 ## Subscriptions
 
-Uma assinatura ativa por usuário. O plano limita a quantidade de instituições,
-não a taxa de split.
+Uma assinatura ativa por **instituição**. O plano é o tenant: um usuário pode
+abrir várias instituições, cada uma com a sua assinatura e o seu plano. Não há
+cota de instituições, e o plano nunca limita a taxa de split.
 
 ### GET /plans
 
@@ -341,29 +342,33 @@ não a taxa de split.
 
 ```json
 [
-  { "code": "free", "name": "Básico", "price_brl": "0.00", "max_institutions": 1 },
-  { "code": "pro", "name": "Pro", "price_brl": "97.00", "max_institutions": 5 },
-  { "code": "enterprise", "name": "Enterprise", "price_brl": "497.00", "max_institutions": null }
+  { "code": "free", "name": "Básico", "price_brl": "0.00", "features": ["Perfil público", "Feed de transparência", "Comprovantes"] },
+  { "code": "pro", "name": "Pro", "price_brl": "97.00", "features": ["Campanhas com meta", "Prestação de contas com parecer", "Exportação DOAR"] },
+  { "code": "enterprise", "name": "Enterprise", "price_brl": "497.00", "features": ["Tudo do Pro", "Gerente de conta", "SLA de suporte"] }
 ]
 ```
 
-`max_institutions: null` significa ilimitado.
+`features` é apresentação. O que autoriza é o status da assinatura, nunca a
+lista de features.
 
-### GET /subscriptions/current
+### GET /institutions/:id/subscription
 
 **200**
 
 ```json
 {
   "id": 3,
+  "institution_id": 7,
   "plan": { "code": "pro", "name": "Pro", "price_brl": "97.00" },
-  "status": "active",
-  "institutions_used": 2,
-  "institutions_remaining": 3
+  "status": "active"
 }
 ```
 
-### POST /subscriptions
+O gate do feed de transparência é o próprio `status`. A API não expõe um campo
+`publishing_allowed` separado porque seria a mesma resposta com outro nome: sem
+assinatura ativa, a instituição recebe as doações mas não publica.
+
+### POST /institutions/:id/subscription
 
 ```json
 { "plan_code": "pro" }
@@ -371,12 +376,12 @@ não a taxa de split.
 
 **201**
 
-**409** — já existe assinatura ativa. Uma por usuário.
+**409** — já existe assinatura ativa. Uma por instituição.
 
 ### DELETE /subscriptions/:id
 
-Cancela. Instituições existentes continuam operando, mas novas instituições
-ficam bloqueadas. **204**.
+Cancela. A instituição continua recebendo as doações já confirmadas, mas perde
+o direito de publicar no feed de transparência. **204**.
 
 ---
 

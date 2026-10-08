@@ -84,7 +84,12 @@ CREATE INDEX idx_institutions_status ON institutions (status);
 
 ## Tabela: `plans`
 
-Catálogo de planos. `max_institutions` nulo significa ilimitado.
+Catálogo de planos. Não tem cota de instituições: a assinatura é por
+instituição, então o número de instituições deixou de ser uma cota e passou a
+ser uma quantidade de assinaturas.
+
+`features` é texto de apresentação. O domínio nunca a consulta para autorizar
+nada — o que autoriza é o status da assinatura.
 
 ```sql
 CREATE TABLE plans (
@@ -92,13 +97,10 @@ CREATE TABLE plans (
   code VARCHAR(30) NOT NULL,
   name VARCHAR(60) NOT NULL,
   price_brl DECIMAL(10, 2) NOT NULL DEFAULT 0,
-  max_institutions INTEGER,
   features JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT plans_code_check CHECK (code IN ('free', 'pro', 'enterprise')),
-  CONSTRAINT plans_max_institutions_check
-    CHECK (max_institutions IS NULL OR max_institutions > 0),
   CONSTRAINT plans_price_check CHECK (price_brl >= 0),
   CONSTRAINT plans_code_unique UNIQUE (code)
 );
@@ -106,13 +108,17 @@ CREATE TABLE plans (
 
 ## Tabela: `subscriptions`
 
-Uma assinatura ativa por usuário. O índice parcial abaixo é o que garante isso
-no banco — a regra não pode depender só da aplicação.
+Uma assinatura ativa por **instituição**. O índice parcial abaixo é o que
+garante isso no banco — a regra não pode depender só da aplicação.
+
+Um usuário pode ter várias instituições, cada uma com a sua assinatura e o seu
+plano. É por isso que `institutions.user_id` existe no agregado: sem o dono, o
+domínio não tem caminho de uma instituição até a assinatura.
 
 ```sql
 CREATE TABLE subscriptions (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  institution_id BIGINT NOT NULL REFERENCES institutions(id),
   plan_id BIGINT NOT NULL REFERENCES plans(id),
   asaas_subscription_id VARCHAR(64),
   status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -124,8 +130,8 @@ CREATE TABLE subscriptions (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX idx_subscriptions_one_active_per_user
-  ON subscriptions (user_id) WHERE status = 'active';
+CREATE UNIQUE INDEX idx_subscriptions_one_active_per_institution
+  ON subscriptions (institution_id) WHERE status = 'active';
 CREATE INDEX idx_subscriptions_plan_id ON subscriptions (plan_id);
 CREATE INDEX idx_subscriptions_asaas_id ON subscriptions (asaas_subscription_id);
 ```
@@ -374,9 +380,9 @@ rails generate migration CreateInstitutions user_id:integer \
   registration_status:string status:string
 
 rails generate migration CreatePlans code:string name:string \
-  price_brl:decimal max_institutions:integer features:jsonb
+  price_brl:decimal features:jsonb
 
-rails generate migration CreateSubscriptions user_id:integer plan_id:integer \
+rails generate migration CreateSubscriptions institution_id:integer plan_id:integer \
   asaas_subscription_id:string status:string current_period_ends_at:datetime \
   cancelled_at:datetime
 

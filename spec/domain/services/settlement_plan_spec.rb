@@ -3,6 +3,7 @@ require_relative "../../domain_helper"
 RSpec.describe SettlementPlan do
   let(:subaccount_institution) do
     Institution.new(
+      user_id: "user_1",
       id: "ins_1",
       legal_name: "Instituto Semear",
       settlement_strategy: :subaccount,
@@ -24,6 +25,7 @@ RSpec.describe SettlementPlan do
 
   let(:pix_payout_institution) do
     Institution.new(
+      user_id: "user_1",
       id: "ins_2",
       legal_name: "Criador de Conteudo",
       settlement_strategy: :pix_payout,
@@ -78,6 +80,7 @@ RSpec.describe SettlementPlan do
 
   it "refuses an institution that cannot accept donations" do
     draft = Institution.new(
+      user_id: "user_1",
       id: "ins_3", legal_name: "Novo", settlement_strategy: :pix_payout, pix_key: "a@b.com"
     )
 

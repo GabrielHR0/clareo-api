@@ -1,35 +1,44 @@
 require_relative "../../domain_helper"
 
 RSpec.describe Plan do
-  def plan(**overrides)
-    described_class.build(code: :pro, name: "Pro", price: "97.00", **overrides)
+  let(:free) { described_class.build(code: :free, name: "Básico", price: "0") }
+  let(:pro) { described_class.build(code: :pro, name: "Pro", price: "97.00") }
+
+  it "carries price and presentation" do
+    expect(pro.price).to eq(Money.brl("97.00"))
+    expect(pro.name).to eq("Pro")
   end
 
-  it "defaults to unlimited institutions" do
-    expect(plan(max_institutions: nil)).to be_unlimited_institutions
+  it "recognises the free plan by price, not by code" do
+    expect(free.free?).to be(true)
+    expect(pro.free?).to be(false)
   end
 
-  it "permits another institution below the limit" do
-    expect(plan(max_institutions: 5).allows?(4)).to be(true)
+  it "does not carry an institution quota, because the plan is per institution" do
+    expect(described_class.instance_methods).not_to include(:allows?, :remaining_slots, :unlimited_institutions?)
   end
 
-  it "refuses another institution at the limit" do
-    expect(plan(max_institutions: 5).allows?(5)).to be(false)
+  it "keeps features as presentation only, never as a gate" do
+    plan = described_class.build(code: :pro, name: "Pro", price: "97.00", features: [ "Transparência" ])
+
+    expect(plan.features).to eq([ "Transparência" ])
+    expect(described_class.instance_methods).not_to include(:allows_feature?)
   end
 
-  it "never reports negative remaining slots" do
-    expect(plan(max_institutions: 5).remaining_slots(7)).to eq(0)
-  end
+  describe "invariants" do
+    it "refuses a tier outside the catalogue" do
+      expect { described_class.build(code: :gold, name: "Gold", price: "1") }
+        .to raise_error(InvalidSubscription, /plan code must be one of/)
+    end
 
-  it "knows it is free" do
-    expect(plan(code: :free, price: "0")).to be_free
-  end
+    it "refuses a negative price" do
+      expect { described_class.build(code: :pro, name: "Pro", price: "-1") }
+        .to raise_error(InvalidSubscription, /price cannot be negative/)
+    end
 
-  it "rejects an unknown tier" do
-    expect { plan(code: :enterprise_plus) }.to raise_error(InvalidSubscription)
-  end
-
-  it "rejects a non-positive institution limit" do
-    expect { plan(max_institutions: 0) }.to raise_error(InvalidSubscription)
+    it "requires a name" do
+      expect { described_class.build(code: :pro, name: "  ", price: "1") }
+        .to raise_error(InvalidSubscription, /name cannot be blank/)
+    end
   end
 end

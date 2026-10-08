@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Suite completa no container de desenvolvimento: rspec, rubocop e zeitwerk.
+# E o que roda antes de qualquer commit, porque o CI roda os mesmos passos.
+#
+# O bundle fica num volume nomeado, entao a segunda execucao e muito mais rapida
+# que a primeira.
+set -euo pipefail
+
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+echo "=== rspec (test) ==="
+RAILS_ENV=test bin/docker-dev rspec
+
+echo ""
+echo "=== rubocop ==="
+bin/docker-dev rubocop
+
+echo ""
+echo "=== zeitwerk:check ==="
+bin/docker-dev rails zeitwerk:check
+
+echo ""
+echo "=== migrations pendentes ==="
+bin/docker-dev rails db:migrate:status
+
+echo ""
+echo "tudo verde"

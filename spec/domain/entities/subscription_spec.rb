@@ -1,40 +1,18 @@
 require_relative "../../domain_helper"
 
+# A assinatura pertence à instituição. Um usuário pode ter várias, cada uma
+# pagando o seu próprio plano.
 RSpec.describe Subscription do
-  let(:pro) { Plan.build(code: :pro, name: "Pro", price: "97.00", max_institutions: 5) }
-  let(:free) { Plan.build(code: :free, name: "Básico", price: "0", max_institutions: 1) }
+  let(:pro) { Plan.build(code: :pro, name: "Pro", price: "97.00") }
+  let(:free) { Plan.build(code: :free, name: "Básico", price: "0") }
 
   def subscription(**overrides)
-    described_class.new(id: "sub_1", user_id: "user_1", plan: pro, **overrides)
+    described_class.new(id: "sub_1", institution_id: "ins_1", plan: pro, **overrides)
   end
 
-  it "carries a single subscription per user" do
-    expect(subscription.user_id).to eq("user_1")
-  end
-
-  describe "institution quota" do
-    it "permits another institution while below the plan limit" do
-      expect(subscription.allows_another_institution?(4)).to be(true)
-    end
-
-    it "refuses another institution once the limit is reached" do
-      expect(subscription.allows_another_institution?(5)).to be(false)
-    end
-
-    it "reports remaining slots" do
-      expect(subscription.remaining_institution_slots(2)).to eq(3)
-    end
-
-    it "is unlimited when the plan allows it" do
-      unlimited = subscription(plan: Plan.build(code: :enterprise, name: "Enterprise", price: "497.00"))
-
-      expect(unlimited.allows_another_institution?(99)).to be(true)
-      expect(unlimited.remaining_institution_slots(99)).to be_nil
-    end
-
-    it "caps a free user at one institution" do
-      expect(subscription(plan: free).allows_another_institution?(1)).to be(false)
-    end
+  it "belongs to an institution, not to a user" do
+    expect(subscription.institution_id).to eq("ins_1")
+    expect(described_class.instance_methods).not_to include(:user_id)
   end
 
   describe "good standing" do
@@ -42,16 +20,34 @@ RSpec.describe Subscription do
       expect(subscription).to be_in_good_standing
     end
 
-    it "fails once past due, so no new institutions are registered" do
-      expect(subscription.mark_past_due!).not_to be_in_good_standing
+    it "fails once past due, which stops publishing but not donations" do
+      delinquent = subscription.mark_past_due!
+
+      expect(delinquent).not_to be_in_good_standing
     end
 
     it "fails once cancelled" do
       expect(subscription.cancel!).not_to be_in_good_standing
     end
+  end
 
-    it "withdraws the institution quota when past due" do
-      expect(subscription.mark_past_due!.allows_another_institution?(0)).to be(false)
+  describe "publishing gate" do
+    # Não há feature flag nem contagem a consultar: a assinatura É o plano, então
+    # publicar e estar em dia são a mesma pergunta.
+    it "allows publishing while active" do
+      expect(subscription).to be_in_good_standing
+    end
+
+    it "blocks publishing when past due" do
+      expect(subscription.mark_past_due!).not_to be_in_good_standing
+    end
+
+    it "blocks publishing when cancelled" do
+      expect(subscription.cancel!).not_to be_in_good_standing
+    end
+
+    it "does not carry a separate publishing flag, because it would be the same answer" do
+      expect(described_class.instance_methods).not_to include(:publishing_allowed?)
     end
   end
 
@@ -62,9 +58,14 @@ RSpec.describe Subscription do
     expect(record.provider_subscription_id).to be_nil
   end
 
+  it "requires an institution" do
+    expect { described_class.new(id: "sub_1", institution_id: nil, plan: pro) }
+      .to raise_error(InvalidSubscription, /institution is required/)
+  end
+
   it "requires a plan" do
-    expect { described_class.new(id: "sub_1", user_id: "user_1", plan: nil) }
-      .to raise_error(InvalidSubscription)
+    expect { described_class.new(id: "sub_1", institution_id: "ins_1", plan: nil) }
+      .to raise_error(InvalidSubscription, /plan is required/)
   end
 
   describe "transition guards" do
