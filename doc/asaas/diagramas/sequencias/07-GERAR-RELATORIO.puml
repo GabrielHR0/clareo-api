@@ -1,0 +1,84 @@
+@startuml Sequencia - Gerar Relatorio
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Gerar Relatório
+
+actor "Instituição" as Institution
+participant "Frontend" as Front
+participant "ReportsController" as Controller
+participant "ReportService" as Service
+database "PostgreSQL" as DB
+
+== Caso de Uso: Gerar Relatório (Pro) ==
+
+Institution -> Front : Define período\ne formato (PDF/CSV)
+activate Front
+
+Front -> Controller : POST /api/v1/reports\n{period_start: "2026-08-01",\nperiod_end: "2026-08-31",\nformat: "pdf"}
+activate Controller
+
+Controller -> Controller : verify JWT\n(role == institution)
+
+Controller -> Service : generate(params, institution_id)
+activate Service
+
+Service -> DB : SELECT plan FROM subscriptions\nWHERE institution_id = ?
+activate DB
+DB --> Service : subscription
+deactivate DB
+
+alt subscription.plan != 'pro'
+  Service --> Controller : 403 Forbidden
+else subscription.plan == 'pro'
+  Service -> DB : SELECT COUNT(*), SUM(amount_brl),\nAVG(amount_brl)\nFROM donations d\nJOIN donation_splits ds\nON d.id = ds.donation_id\nWHERE ds.institution_id = ?\nAND d.created_at BETWEEN ? AND ?
+  activate DB
+  DB --> Service : stats
+  deactivate DB
+
+  Service -> Service : Gerar arquivo\n(PDF ou CSV)
+
+  Service -> Service : Upload to storage
+
+  Service -> DB : INSERT INTO donation_reports\n(institution_id, period_start,\nperiod_end, format, file_url,\ngenerated_at, total_donations,\ntotal_amount, average_donation)
+  activate DB
+  DB --> Service : report
+  deactivate DB
+
+  Service --> Controller : report
+end
+
+deactivate Service
+
+Controller --> Front : 201 Created\n{report: {id, download_url,\ntotal_donations, total_amount,\naverage_donation}}
+deactivate Controller
+
+Front --> Institution : Exibe relatório\nou erro
+deactivate Front
+
+== Caso de Uso: Baixar Relatório ==
+
+Institution -> Front : Clica em "Baixar"
+activate Front
+
+Front -> Controller : GET /api/v1/reports/:id/download
+activate Controller
+
+Controller -> DB : SELECT file_url\nFROM donation_reports\nWHERE id = ?
+activate DB
+DB --> Controller : report
+deactivate DB
+
+Controller --> Front : 302 Redirect\n→ file_url
+deactivate Controller
+
+Front --> Institution : Download do arquivo
+deactivate Front
+
+@enduml

@@ -1,0 +1,70 @@
+@startuml Clareo - Assinatura
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+
+title Clareo — Diagrama de Casos de Uso: Assinatura
+
+left to right direction
+
+' ===== Atores =====
+actor "Instituição" as Institution
+actor "Asaas" as Asaas
+
+' ===== Sistema =====
+rectangle "Sistema Clareo" {
+
+  package "Gerenciar Plano" {
+    usecase "Ver Plano Atual" as UC1
+    usecase "Ver Funcionalidades\nDisponíveis" as UC2
+    usecase "Ver Faturas" as UC3
+    usecase "Ver Status Assinatura" as UC4
+  }
+
+  package "Upgrade" {
+    usecase "Fazer Upgrade para Pro" as UC5
+    usecase "Confirmar Pagamento" as UC6
+    usecase "Ativar Funcionalidades Pro" as UC7
+  }
+
+  package "Cancelamento" {
+    usecase "Cancelar Assinatura" as UC8
+    usecase "Desativar Funcionalidades Pro" as UC9
+    usecase "Reativar Assinatura" as UC10
+  }
+}
+
+' ===== Asaas =====
+rectangle "Asaas (PSP)" {
+  usecase "Criar Assinatura Recorrente" as UC_A1
+  usecase "Gerar Cobrança Mensal" as UC_A2
+  usecase "Cancelar Assinatura Asaas" as UC_A3
+  usecase "Webhook SUBSCRIPTION" as UC_A4
+}
+
+' ===== Conexões =====
+Institution --> UC1
+Institution --> UC2
+Institution --> UC3
+Institution --> UC4
+Institution --> UC5
+Institution --> UC8
+Institution --> UC10
+
+' ===== Relacionamentos =====
+UC5 ..> UC_A1 : <<include>>
+UC5 ..> UC_A2 : <<include>>
+UC_A4 --> UC4 : atualiza
+UC8 ..> UC_A3 : <<include>>
+UC10 ..> UC_A1 : recria
+UC6 ..> UC_A4 : via webhook
+UC7 ..> UC6 : after
+UC9 ..> UC8 : after
+
+@enduml

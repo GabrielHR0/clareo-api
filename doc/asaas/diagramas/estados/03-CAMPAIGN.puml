@@ -1,0 +1,55 @@
+@startuml Estado - Campaign
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam stateFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor<<active>> LightBlue
+  BackgroundColor<<final>> LightGreen
+  BackgroundColor<<error>> LightRed
+  BorderColor DarkGray
+  FontSize 12
+}
+
+title Estado: Campaign (Campanha)
+
+[*] --> active : Campanha criada
+
+active --> paused : Instituição\npausa campanha
+
+paused --> active : Instituição\nretoma campanha
+
+active --> closed : Data fim\nalcançada\nou instituição\nencerra
+
+paused --> closed : Data fim\nalcançada\nou instituição\nencerra
+
+closed --> [*]
+
+state active <<active>>
+state paused <<active>>
+state closed <<final>>
+
+note right of active
+  Campanha visível
+  no feed público.
+  Aceita doações.
+  Exibe progresso.
+end note
+
+note left of paused
+  Campanha escondida
+  do feed público.
+  Não aceita doações.
+  Progresso preservado.
+end note
+
+note bottom of closed
+  Campanha encerrada.
+  Não aceita doações.
+  Estatísticas finais
+  preservadas.
+end note
+
+@enduml

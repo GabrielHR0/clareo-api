@@ -1,0 +1,67 @@
+@startuml Sequencia - Criar Subconta
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Criar Subconta (Admin)
+
+actor "Admin" as Admin
+participant "Frontend" as Front
+participant "InstitutionsController" as Controller
+participant "InstitutionService" as Service
+participant "AsaasService" as Asaas
+database "PostgreSQL" as DB
+
+== Caso de Uso: Cadastrar Instituição ==
+
+Admin -> Front : Preenche dados\n(nome, CNPJ, email, PIX)
+activate Front
+
+Front -> Controller : POST /api/v1/institutions\n{name, cnpj, email,\npix_key, description}
+activate Controller
+
+Controller -> Controller : verify JWT\n(role == admin)
+
+Controller -> Service : create(params)
+activate Service
+
+Service -> Asaas : create_customer(\nname, cpfCnpj, email)
+activate Asaas
+Asaas --> Service : {id: "cus_abc123"}
+deactivate Asaas
+
+Service -> Asaas : create_subaccount(\nname, cpfCnpj, email)
+activate Asaas
+Asaas --> Service : {id: "sub_xyz789",\nwalletId: "wallet_123"}
+deactivate Asaas
+
+Service -> DB : INSERT INTO users\n(name, email, role: 'institution',\npassword_digest)
+activate DB
+DB --> Service : user
+deactivate DB
+
+Service -> DB : INSERT INTO institutions\n(user_id, name, cnpj,\ndescription, pix_key,\nasaas_customer_id,\nasaas_wallet_id, active: true)
+activate DB
+DB --> Service : institution
+deactivate DB
+
+Service -> DB : INSERT INTO subscriptions\n(institution_id, plan: 'free',\nstatus: 'active')
+activate DB
+DB --> Service : subscription
+deactivate DB
+
+Service --> Controller : institution
+deactivate Service
+
+Controller --> Front : 201 Created\n{institution}
+deactivate Controller
+
+Front --> Admin : Exibe instituição\ncadastrada com sucesso
+deactivate Front
+
+@enduml

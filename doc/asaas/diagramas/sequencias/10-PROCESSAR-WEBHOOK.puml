@@ -1,0 +1,88 @@
+@startuml Sequencia - Processar Webhook
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Processar Webhook
+
+actor "Asaas" as Asaas
+participant "WebhooksController" as Controller
+participant "WebhookService" as Service
+database "PostgreSQL" as DB
+
+== Caso de Uso: Processar Webhook ==
+
+Asaas -> Controller : POST /api/v1/webhooks/asaas\n{event: "PAYMENT_RECEIVED",\npayment: {id, status, value, splits}}
+activate Controller
+
+Controller -> Controller : verify signature
+
+Controller -> Service : process(params)
+activate Service
+
+Service -> Service : Identificar evento
+
+alt event == "PAYMENT_RECEIVED"
+  Service -> DB : SELECT * FROM donations\nWHERE asaas_payment_id = ?
+  activate DB
+  DB --> Service : donation
+  deactivate DB
+
+  Service -> DB : UPDATE donations\nSET status = 'received'\nWHERE id = ?
+  activate DB
+  DB --> Service : updated
+  deactivate DB
+
+  Service -> DB : UPDATE donation_splits\nSET status = 'awaiting_credit'\nWHERE donation_id = ?
+  activate DB
+  DB --> Service : updated
+  deactivate DB
+
+else event == "PAYMENT_SPLIT_DONE"
+  Service -> DB : SELECT * FROM donations\nWHERE asaas_payment_id = ?
+  activate DB
+  DB --> Service : donation
+  deactivate DB
+
+  Service -> DB : UPDATE donations\nSET status = 'split_done'
+  activate DB
+  DB --> Service : updated
+  deactivate DB
+
+  Service -> DB : UPDATE donation_splits\nSET status = 'done'
+  activate DB
+  DB --> Service : updated
+  deactivate DB
+
+else event == "SUBSCRIPTION_CREATED"
+  Service -> DB : SELECT * FROM subscriptions\nWHERE asaas_subscription_id = ?
+  activate DB
+  DB --> Service : subscription
+  deactivate DB
+
+  Service -> DB : UPDATE subscriptions\nSET status = 'active'
+  activate DB
+  DB --> Service : updated
+  deactivate DB
+
+else event == "PAYMENT_SPLIT_DIVERGENCE_BLOCK"
+  Service -> DB : SELECT * FROM donations\nWHERE asaas_payment_id = ?
+  activate DB
+  DB --> Service : donation
+  deactivate DB
+
+  Service -> Service : Log warning\n"Split bloqueado"
+end
+
+Service --> Controller : processed
+deactivate Service
+
+Controller --> Asaas : 200 OK
+deactivate Controller
+
+@enduml

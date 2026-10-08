@@ -1,0 +1,65 @@
+@startuml Implantacao - Detalhado
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam nodeFontSize 12
+skinparam componentFontSize 11
+skinparam databaseFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+
+title Clareo — Diagrama de Implantação (Detalhado)
+
+node "Dispositivo do Usuário" as Device {
+  component "Navegador Web" as Browser
+  component "App Bancário" as BankApp
+}
+
+node "Servidor Clareo" as ClareoServer {
+  component "Rails API\n(Puma)" as Puma
+  component "Sidekiq\n(Jobs)" as Jobs
+  component "Redis\n(Cache/Queue)" as Redis
+}
+
+node "Banco de Dados" as DBNode {
+  database "PostgreSQL 15" as PG
+}
+
+node "Storage" as S3Node {
+  component "AWS S3" as S3
+}
+
+node "CDN" as CDNNode {
+  component "CloudFront" as CDN
+}
+
+node "Asaas (PSP)" as AsaasNode {
+  component "API v3" as AsaasAPI
+  component "Webhooks" as AsaasWH
+  component "PIX Engine" as PIX
+}
+
+node "Banco Central" as BCBNode {
+  component "SPI (PIX)" as SPI
+}
+
+Browser --> CDN : HTTPS
+CDN --> Puma : HTTPS
+
+BankApp --> SPI : PIX
+
+Puma --> PG : SQL
+Puma --> Redis : TCP 6379
+Puma --> AsaasAPI : HTTPS
+Puma --> S3 : HTTPS
+
+Jobs --> Redis : consome fila
+Jobs --> PG : SQL
+Jobs --> AsaasAPI : HTTPS
+
+AsaasWH --> Puma : Webhook
+
+AsaasAPI --> PIX : interno
+PIX --> SPI : SPI
+
+@enduml

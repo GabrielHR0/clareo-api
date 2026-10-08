@@ -1,0 +1,67 @@
+@startuml Clareo - Integracao Asaas
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+
+title Clareo — Diagrama de Casos de Uso: Integração Asaas
+
+' ===== Atores =====
+actor "Doador" as Donor
+actor "Instituição" as Institution
+actor "Admin" as Admin
+actor "Asaas" as Asaas
+
+' ===== Fluxo de Cobrança =====
+rectangle "Sistema Clareo" as Clareo {
+
+  package "Envio (Doador → Clareo)" {
+    usecase "Criar Cobrança com Split" as UC1
+    usecase "Gerar PIX Dinâmico" as UC2
+  }
+
+  package "Processamento (Asaas)" {
+    usecase "Split Automático" as UC3
+    usecase "Transferir PIX" as UC4
+  }
+
+  package "Recebimento (Instituição)" {
+    usecase "Registrar Doação" as UC5
+    usecase "Notificar Instituição" as UC6
+  }
+
+  package "Subcontas" {
+    usecase "Criar Subconta" as UC7
+  }
+
+  package "Assinatura" {
+    usecase "Criar Assinatura Pro" as UC8
+  }
+}
+
+' ===== Fluxo Linear =====
+Donor --> UC1
+UC1 --> UC2
+UC2 --> Asaas
+Asaas --> UC3
+UC3 --> UC4
+UC4 --> Institution
+
+' ===== Webhook =====
+Asaas --> UC5 : webhook
+UC5 --> UC6
+
+' ===== Admin =====
+Admin --> UC7
+UC7 --> Asaas : cria subconta
+
+' ===== Assinatura =====
+Institution --> UC8
+UC8 --> Asaas : cria assinatura
+
+@enduml

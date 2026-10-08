@@ -1,0 +1,117 @@
+@startuml Clareo - Visao Geral
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageFontSize 13
+skinparam packageStyle rectangle
+skinparam useCaseFontSize 11
+skinparam actorFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+
+title Clareo — Diagrama de Casos de Uso (Visão Geral)
+
+left to right direction
+
+' ===== Atores =====
+actor "Visitante" as Visitor
+actor "Doador" as Donor
+actor "Instituição" as Institution
+actor "Admin" as Admin
+actor "Asaas" as Asaas
+
+' ===== Sistema =====
+rectangle "Sistema Clareo" {
+
+  package "Autenticação" {
+    usecase "Cadastrar Conta" as UC1
+    usecase "Fazer Login" as UC2
+  }
+
+  package "Doação" {
+    usecase "Doar via PIX" as UC3
+    usecase "Ver Doações" as UC4
+    usecase "Ver Status da Doação" as UC5
+  }
+
+  package "Campanhas (Pro)" {
+    usecase "Criar Campanha" as UC6
+    usecase "Ver Campanhas" as UC7
+    usecase "Gerenciar Campanha" as UC8
+  }
+
+  package "Transparência" {
+    usecase "Postar Atualização" as UC9
+    usecase "Ver Feed" as UC10
+    usecase "Upload Comprovante" as UC11
+  }
+
+  package "Relatórios (Pro)" {
+    usecase "Gerar Relatório" as UC12
+    usecase "Baixar Relatório" as UC13
+  }
+
+  package "Financeiro (Pro)" {
+    usecase "Ver Saldo" as UC14
+    usecase "Ver Extrato" as UC15
+  }
+
+  package "Assinatura" {
+    usecase "Gerenciar Plano" as UC16
+    usecase "Fazer Upgrade" as UC17
+  }
+
+  package "Administração" {
+    usecase "Gerenciar Instituições" as UC18
+    usecase "Gerenciar Usuários" as UC19
+    usecase "Ver Relatórios Admin" as UC20
+  }
+
+  package "Integração Asaas" {
+    usecase "Criar Subconta" as UC21
+    usecase "Criar Cobrança\ncom Split" as UC22
+    usecase "Processar Webhook" as UC23
+  }
+}
+
+' ===== Visitante =====
+Visitor --> UC7
+Visitor --> UC10
+
+' ===== Doador =====
+Donor --> UC1
+Donor --> UC2
+Donor --> UC3
+Donor --> UC4
+Donor --> UC5
+
+' ===== Instituição =====
+Institution --> UC2
+Institution --> UC4
+Institution --> UC6
+Institution --> UC8
+Institution --> UC9
+Institution --> UC11
+Institution --> UC12
+Institution --> UC13
+Institution --> UC14
+Institution --> UC15
+Institution --> UC16
+Institution --> UC17
+
+' ===== Admin =====
+Admin --> UC2
+Admin --> UC18
+Admin --> UC19
+Admin --> UC20
+
+' ===== Asaas =====
+Asaas --> UC21
+Asaas --> UC23
+
+' ===== Relacionamentos =====
+UC3 ..> UC22 : <<include>>
+UC22 ..> UC21 : <<include>>
+UC23 ..> UC4 : notifica
+
+@enduml

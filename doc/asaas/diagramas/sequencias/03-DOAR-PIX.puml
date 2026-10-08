@@ -1,0 +1,121 @@
+@startuml Sequencia - Doar via PIX
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam sequenceArrowFontSize 10
+skinparam sequenceLifeLineBorderColor gray
+skinparam sequenceGroupBorderColor darkgray
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+title Sequência: Doar via PIX
+
+actor "Doador" as Donor
+participant "Frontend" as Front
+participant "DonationsController" as Controller
+participant "DonationService" as Service
+participant "AsaasService" as Asaas
+database "PostgreSQL" as DB
+
+== Caso de Uso: Doar via PIX ==
+
+Donor -> Front : Seleciona instituição\nDefine valor
+activate Front
+
+Front -> Controller : POST /api/v1/donations\n{amount_brl, institution_ids}
+activate Controller
+
+Controller -> Service : create(params)
+activate Service
+
+Service -> DB : SELECT * FROM institutions\nWHERE id IN (?) AND active = true
+activate DB
+DB --> Service : institutions
+deactivate DB
+
+Service -> Service : Calcular splits\n(50% inst A, 50% inst B)
+
+Service -> Asaas : create_payment(customer_id,\namount, splits)
+activate Asaas
+
+Asaas --> Service : payment\n{id, pixCopyPaste,\npixQrCode, invoiceUrl}
+deactivate Asaas
+
+Service -> DB : INSERT INTO donations\n(donor_name, donor_email,\namount_brl, asaas_payment_id,\nstatus: 'pending')
+activate DB
+DB --> Service : donation
+deactivate DB
+
+Service -> DB : INSERT INTO donation_splits\n(donation_id, institution_id,\namount, percentual, status)
+activate DB
+DB --> Service : splits
+deactivate DB
+
+Service --> Controller : donation
+deactivate Service
+
+Controller --> Front : 201 Created\n{donation_id, pix_copy_paste,\npix_qr_code, amount_brl}
+deactivate Controller
+
+Front --> Donor : Exibe QR Code\ne código PIX
+deactivate Front
+
+== Doador paga via PIX ==
+
+Donor -> Front : Copia código PIX\nou escaneia QR Code
+activate Front
+
+Donor -> Front : Paga R$ 100,00\nvia app bancário
+deactivate Front
+
+== Webhook: Pagamento Recebido ==
+
+participant "Asaas" as AsaasWH
+
+AsaasWH -> Controller : POST /api/v1/webhooks/asaas\n{event: "PAYMENT_RECEIVED",\npayment_id: "pay_123"}
+activate Controller
+
+Controller -> Service : confirm(payment_id)
+activate Service
+
+Service -> DB : UPDATE donations\nSET status = 'received'\nWHERE asaas_payment_id = ?
+activate DB
+DB --> Service : updated
+deactivate DB
+
+Service -> DB : UPDATE donation_splits\nSET status = 'awaiting_credit'\nWHERE donation_id = ?
+activate DB
+DB --> Service : updated
+deactivate DB
+
+Service --> Controller : donation
+deactivate Service
+
+Controller --> AsaasWH : 200 OK
+deactivate Controller
+
+== Webhook: Split Concluído ==
+
+AsaasWH -> Controller : POST /api/v1/webhooks/asaas\n{event: "PAYMENT_SPLIT_DONE",\npayment_id: "pay_123"}
+activate Controller
+
+Controller -> Service : update_split_status(payment_id)
+activate Service
+
+Service -> DB : UPDATE donations\nSET status = 'split_done'
+activate DB
+DB --> Service : updated
+deactivate DB
+
+Service -> DB : UPDATE donation_splits\nSET status = 'done'
+activate DB
+DB --> Service : updated
+deactivate DB
+
+Service --> Controller : donation
+deactivate Service
+
+Controller --> AsaasWH : 200 OK
+deactivate Controller
+
+@enduml

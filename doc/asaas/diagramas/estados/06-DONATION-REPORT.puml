@@ -1,0 +1,52 @@
+@startuml Estado - DonationReport
+!theme plain
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam stateFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor<<active>> LightBlue
+  BackgroundColor<<final>> LightGreen
+  BackgroundColor<<error>> LightRed
+  BorderColor DarkGray
+  FontSize 12
+}
+
+title Estado: DonationReport (Relatório)
+
+[*] --> generating : Solicitação\nde relatório
+
+generating --> generated : Arquivo\ngerado com\nsucesso
+
+generating --> failed : Erro na\ngeração do\narquivo
+
+generated --> [*] : Relatório\ndisponível para\ndownload
+
+failed --> [*]
+
+state generating <<active>>
+state generated <<final>>
+state failed <<error>>
+
+note right of generating
+  Sistema está
+  consultando banco,
+  calculando totais
+  e gerando arquivo.
+end note
+
+note bottom of generated
+  Arquivo PDF ou CSV
+  salvo no storage.
+  URL de download
+  disponível.
+end note
+
+note left of failed
+  Erro durante
+  geração do
+  relatório.
+end note
+
+@enduml
