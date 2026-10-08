@@ -19,8 +19,10 @@ RSpec.describe "persistência" do
   end
 
   # id nil: agregado novo. Quem atribui o id é o banco.
+  # O dono vem no agregado: sem ele o domínio não tem caminho até a assinatura.
   def nova_instituicao(**overrides)
     Institution.new(
+      user_id: user.id,
       legal_name: "Instituto Persistido",
       settlement_strategy: :pix_payout,
       pix_key: "financeiro@instituto.org",
@@ -31,6 +33,7 @@ RSpec.describe "persistência" do
 
   def instituicao_pj(cnpj)
     Institution.new(
+      user_id: user.id,
       legal_name: "Instituto Com CNPJ",
       settlement_strategy: :subaccount,
       cnpj: cnpj,
@@ -47,7 +50,7 @@ RSpec.describe "persistência" do
 
   describe "InstitutionRepository" do
     it "grava e lê um agregado do tipo pix_payout" do
-      saved = institution_repository.save(nova_instituicao, user_id: user.id)
+      saved = institution_repository.save(nova_instituicao)
 
       expect(saved.id).to be_present
       expect(saved).to be_pix_payout
@@ -55,38 +58,35 @@ RSpec.describe "persistência" do
     end
 
     it "atribui o id vindo do banco, não do agregado" do
-      saved = institution_repository.save(nova_instituicao, user_id: user.id)
+      saved = institution_repository.save(nova_instituicao)
 
       expect(saved.id).to be_a(Integer)
     end
 
-    it "exige user_id, porque a instituição pertence a um usuário" do
-      expect { institution_repository.save(nova_instituicao) }
-        .to raise_error(InvalidInstitution, /user is required/)
+    it "exige o dono, porque sem ele a instituição não alcança a assinatura" do
+      expect { Institution.new(legal_name: "Sem Dono", settlement_strategy: :pix_payout, pix_key: "k@x.org") }
+        .to raise_error(InvalidInstitution, /owner is required/)
     end
 
     it "filtra por cnpj, que é único no sistema inteiro" do
-      saved = institution_repository.save(instituicao_pj("66625514000140"), user_id: user.id)
+      saved = institution_repository.save(instituicao_pj("66625514000140"))
 
       expect(institution_repository.find_by_cnpj("66625514000140").id).to eq(saved.id)
     end
 
     it "impede duas instituições com o mesmo cnpj" do
-      institution_repository.save(instituicao_pj("66625514000140"), user_id: user.id)
+      institution_repository.save(instituicao_pj("66625514000140"))
 
       # A validação do model pega antes do índice único do banco, o que dá
       # mensagem de erro utilizável. O índice continua sendo a rede de proteção
       # contra corrida entre duas requisições.
-      expect { institution_repository.save(instituicao_pj("66625514000140"), user_id: user.id) }
+      expect { institution_repository.save(instituicao_pj("66625514000140")) }
         .to raise_error(ActiveRecord::RecordInvalid, /Cnpj/)
     end
 
     it "lista e conta por usuário" do
       2.times do |i|
-        institution_repository.save(
-          nova_instituicao(legal_name: "Inst #{i}", pix_key: "k#{i}@x.org"),
-          user_id: user.id
-        )
+        institution_repository.save(nova_instituicao(legal_name: "Inst #{i}", pix_key: "k#{i}@x.org"))
       end
 
       expect(institution_repository.list_by_user(user.id).size).to eq(2)
@@ -96,7 +96,6 @@ RSpec.describe "persistência" do
     it "grava o vínculo com o provedor em uma única transação" do
       saved = institution_repository.save_with_provider!(
         institution: nova_instituicao,
-        user_id: user.id,
         account_id: "acc_123",
         wallet_id: "wal_456"
       )
@@ -114,8 +113,8 @@ RSpec.describe "persistência" do
 
   describe "DonationRepository" do
     let(:institution) do
-      institution_repository.save(nova_instituicao, user_id: user.id)
-    end
+          institution_repository.save(nova_instituicao)
+        end
 
     def nova_doacao(**overrides)
       Donation.new(
@@ -201,13 +200,13 @@ RSpec.describe "persistência" do
 
   describe "PayoutRepository" do
     it "soma zero quando a instituição não tem nada a receber" do
-      institution = institution_repository.save(nova_instituicao, user_id: user.id)
+      institution = institution_repository.save(nova_instituicao)
 
       expect(payout_repository.pending_amount_for(institution.id)).to eq(Money.zero)
     end
 
     it "soma a entitlement das doações recebidas e ainda não pagas" do
-      institution = institution_repository.save(nova_instituicao, user_id: user.id)
+      institution = institution_repository.save(nova_instituicao)
       donation = Donation.new(
         institution: institution,
         donor_name: "Doador",
@@ -288,43 +287,64 @@ RSpec.describe "persistência" do
   end
 
   describe "PlanRepository e SubscriptionRepository" do
-    let(:pro) { Plan.build(code: :pro, name: "Pro", price: "97.00", max_institutions: 5) }
+      let(:pro) { Plan.build(code: :pro, name: "Pro", price: "97.00") }
 
-    before { plan_repository.save(pro) }
+      # A assinatura é da instituição, então cada caso precisa da sua própria
+      # instituição: duas assinaturas do mesmo usuário são a coisa esperada.
+      let(:primeira) { institution_repository.save(nova_instituicao(legal_name: "Inst A", pix_key: "a@x.org")) }
+      let(:segunda) { institution_repository.save(nova_instituicao(legal_name: "Inst B", pix_key: "b@x.org")) }
 
-    it "lê planos do catálogo" do
-      expect(plan_repository.find_by_code(:pro).max_institutions).to eq(5)
-      expect(plan_repository.list.map(&:code)).to include(:pro)
+      before { plan_repository.save(pro) }
+
+      it "lê planos do catálogo" do
+        expect(plan_repository.find_by_code(:pro).price).to eq(Money.brl("97.00"))
+        expect(plan_repository.list.map(&:code)).to include(:pro)
+      end
+
+      it "encontra a assinatura ativa da instituição" do
+        institution = primeira
+        subscription_repository.save(Subscription.new(institution_id: institution.id, plan: pro))
+
+        found = subscription_repository.find_active_by_institution(institution.id)
+        expect(found.plan.code).to eq(:pro)
+        expect(found.institution_id).to eq(institution.id)
+      end
+
+      it "permite que um mesmo usuário tenha duas instituições em planos separados" do
+        a = primeira
+        b = segunda
+        subscription_repository.save(Subscription.new(institution_id: a.id, plan: pro))
+        subscription_repository.save(Subscription.new(institution_id: b.id, plan: pro))
+
+        expect(subscription_repository.find_active_by_institution(a.id).id)
+          .not_to eq(subscription_repository.find_active_by_institution(b.id).id)
+        expect(a.user_id).to eq(b.user_id)
+      end
+
+      it "impede duas assinaturas ativas para a mesma instituição, no banco" do
+        institution = primeira
+        subscription_repository.save(Subscription.new(institution_id: institution.id, plan: pro))
+
+        second = SubscriptionRecord.new(
+          institution_id: institution.id,
+          plan_id: PlanRecord.find_by!(code: "pro").id,
+          status: "active"
+        )
+
+        expect { second.save! }.to raise_error(ActiveRecord::RecordNotUnique)
+      end
+
+      it "permite reassinar depois de cancelar" do
+        institution = primeira
+        subscription_repository.save(Subscription.new(institution_id: institution.id, plan: pro))
+        existing = subscription_repository.find_active_by_institution(institution.id)
+        existing.cancel!
+        subscription_repository.save(existing)
+
+        expect(subscription_repository.find_active_by_institution(institution.id)).to be_nil
+        expect(
+          subscription_repository.save(Subscription.new(institution_id: institution.id, plan: pro))
+        ).to be_present
+      end
     end
-
-    it "encontra a assinatura ativa do usuário" do
-      subscription_repository.save(Subscription.new(user_id: user.id, plan: pro))
-
-      found = subscription_repository.find_active_by_user(user.id)
-      expect(found.plan.code).to eq(:pro)
-      expect(found.allows_another_institution?(4)).to be(true)
-    end
-
-    it "impede duas assinaturas ativas para o mesmo usuário, no banco" do
-      subscription_repository.save(Subscription.new(user_id: user.id, plan: pro))
-
-      second = SubscriptionRecord.new(
-        user_id: user.id,
-        plan_id: PlanRecord.find_by!(code: "pro").id,
-        status: "active"
-      )
-
-      expect { second.save! }.to raise_error(ActiveRecord::RecordNotUnique)
-    end
-
-    it "permite reassinar depois de cancelar" do
-      subscription_repository.save(Subscription.new(user_id: user.id, plan: pro))
-      existing = subscription_repository.find_active_by_user(user.id)
-      existing.cancel!
-      subscription_repository.save(existing)
-
-      expect(subscription_repository.find_active_by_user(user.id)).to be_nil
-      expect(subscription_repository.save(Subscription.new(user_id: user.id, plan: pro))).to be_present
-    end
-  end
 end

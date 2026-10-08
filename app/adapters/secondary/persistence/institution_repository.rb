@@ -21,11 +21,9 @@ module Persistence
       InstitutionRecord.where(user_id: user_id).count
     end
 
-    def save(institution, user_id: nil)
+    def save(institution)
       record = record_for(institution)
-      RecordMapper.institution_to_record(institution, record, user_id: user_id)
-
-      raise InvalidInstitution, "user is required to persist an institution" if record.user_id.nil?
+      RecordMapper.institution_to_record(institution, record)
 
       record.save!
       RecordMapper.record_to_institution(record)
@@ -33,9 +31,9 @@ module Persistence
 
     # Criação com a subconta do provedor em jogo: institution e o vínculo do
     # provedor precisam ser gravados juntos, ou o registro fica meio ligado.
-    def save_with_provider!(institution:, user_id:, account_id:, wallet_id:)
+    def save_with_provider!(institution:, account_id:, wallet_id:)
       record = record_for(institution)
-      RecordMapper.institution_to_record(institution, record, user_id: user_id)
+      RecordMapper.institution_to_record(institution, record)
       record.asaas_account_id = account_id
       record.asaas_wallet_id = wallet_id
       record.save!
@@ -44,11 +42,11 @@ module Persistence
 
     private
 
-    # id nil significa agregado novo: quem atribui o id é o banco.
-    def record_for(institution)
-      return InstitutionRecord.new if institution.id.nil?
+      # id nil significa agregado novo: quem atribui o id é o banco.
+      def record_for(institution)
+        return InstitutionRecord.new if institution.id.nil?
 
-      InstitutionRecord.find_by(id: institution.id) || InstitutionRecord.new
-    end
+        InstitutionRecord.find_by(id: institution.id) || InstitutionRecord.new
+      end
   end
 end

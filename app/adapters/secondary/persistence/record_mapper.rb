@@ -8,12 +8,12 @@ module Persistence
 
     # ---------- Institution ----------
 
-    # O agregado Institution não guarda o usuário que o administra: essa é uma
-    # relação de autorização, não de negócio. Por isso user_id entra aqui, na
-    # gravação, e não no agregado.
-    def institution_to_record(institution, record = nil, user_id: nil)
+    # O dono da instituição passou a fazer parte do agregado. Sem isso o domínio não
+    # tinha caminho de uma instituição até a assinatura, e o gate de publicação
+    # ficava sem lugar nenhum.
+    def institution_to_record(institution, record = nil)
       record ||= InstitutionRecord.new
-      record.user_id = user_id
+      record.user_id = institution.user_id
       record.legal_name = institution.legal_name
       record.trade_name = institution.trade_name
       record.settlement_strategy = institution.settlement_strategy.to_s
@@ -43,6 +43,7 @@ module Persistence
     def record_to_institution(record)
       Institution.new(
         id: record.id,
+        user_id: record.user_id,
         legal_name: record.legal_name,
         trade_name: record.trade_name,
         settlement_strategy: record.settlement_strategy.to_sym,
@@ -67,7 +68,6 @@ module Persistence
         code: record.code.to_sym,
         name: record.name,
         price: record.price_brl,
-        max_institutions: record.max_institutions,
         features: record.features || []
       )
     end
@@ -77,7 +77,6 @@ module Persistence
       record.code = plan.code.to_s
       record.name = plan.name
       record.price_brl = plan.price.amount
-      record.max_institutions = plan.max_institutions
       record.features = plan.features
       record
     end
@@ -86,9 +85,9 @@ module Persistence
 
     def record_to_subscription(record)
       Subscription.new(
-        id: record.id,
-        user_id: record.user_id,
-        plan: record_to_plan(record.plan_record),
+id: record.id,
+          institution_id: record.institution_id,
+          plan: record_to_plan(record.plan_record),
         provider_subscription_id: record.asaas_subscription_id,
         status: record.status.to_sym,
         current_period_ends_at: record.current_period_ends_at,

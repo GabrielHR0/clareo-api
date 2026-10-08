@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_01_000009) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -134,13 +134,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_01_000009) do
     t.string "code", null: false
     t.datetime "created_at", null: false
     t.jsonb "features", default: [], null: false
-    t.integer "max_institutions"
     t.string "name", null: false
     t.decimal "price_brl", precision: 10, scale: 2, default: "0.0", null: false
     t.datetime "updated_at", null: false
     t.index ["code"], name: "index_plans_on_code", unique: true
     t.check_constraint "code::text = ANY (ARRAY['free'::character varying, 'pro'::character varying, 'enterprise'::character varying]::text[])", name: "plans_code_check"
-    t.check_constraint "max_institutions IS NULL OR max_institutions > 0", name: "plans_max_institutions_check"
     t.check_constraint "price_brl >= 0::numeric", name: "plans_price_check"
   end
 
@@ -149,14 +147,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_01_000009) do
     t.datetime "cancelled_at"
     t.datetime "created_at", null: false
     t.datetime "current_period_ends_at"
+    t.bigint "institution_id", null: false
     t.bigint "plan_id", null: false
     t.string "status", default: "active", null: false
     t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
     t.index ["asaas_subscription_id"], name: "index_subscriptions_on_asaas_subscription_id"
+    t.index ["institution_id"], name: "idx_subscriptions_one_active_per_institution", unique: true, where: "((status)::text = 'active'::text)"
+    t.index ["institution_id"], name: "index_subscriptions_on_institution_id"
     t.index ["plan_id"], name: "index_subscriptions_on_plan_id"
-    t.index ["user_id"], name: "idx_subscriptions_one_active_per_user", unique: true, where: "((status)::text = 'active'::text)"
-    t.index ["user_id"], name: "index_subscriptions_on_user_id"
     t.check_constraint "status::text = ANY (ARRAY['active'::character varying, 'past_due'::character varying, 'cancelled'::character varying, 'expired'::character varying]::text[])", name: "subscriptions_status_check"
   end
 
@@ -199,6 +197,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_01_000009) do
   add_foreign_key "institutions", "users"
   add_foreign_key "payouts", "donations"
   add_foreign_key "payouts", "institutions"
+  add_foreign_key "subscriptions", "institutions"
   add_foreign_key "subscriptions", "plans"
-  add_foreign_key "subscriptions", "users"
 end

@@ -14,6 +14,7 @@ RSpec.describe Institution do
   def subaccount(**overrides)
     described_class.new(
       id: "ins_1",
+      user_id: "user_1",
       legal_name: "Instituto Semear",
       settlement_strategy: :subaccount,
       cnpj: "66625514000140",
@@ -29,6 +30,7 @@ RSpec.describe Institution do
   def pix_payout(**overrides)
     described_class.new(
       id: "ins_2",
+      user_id: "user_1",
       legal_name: "Criador de Conteudo",
       settlement_strategy: :pix_payout,
       cnpj: "52998224725",

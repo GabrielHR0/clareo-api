@@ -1,7 +1,8 @@
 # Seeds idempotentes. Executar com: bin/rails db:seed
 #
-# Os planos não são configuração livre: `max_institutions` é o que o domínio
-# consulta ao decidir se um usuário pode cadastrar outra instituição.
+# Os planos não são configuração livre: `features` é texto de apresentação, lido
+# no marketing e nunca consultado pelo domínio para autorizar nada. O que
+# autoriza é o status da assinatura da própria instituição.
 
 module Seeds
   PLANS = [
@@ -9,18 +10,16 @@ module Seeds
       code: "free",
       name: "Básico",
       price_brl: 0,
-      max_institutions: 1,
-      features: [ "1 instituição", "Até 100 doações/mês", "Relatório mensal" ]
+      features: [ "Perfil público", "Feed de transparência", "Comprovantes" ]
     },
     {
       code: "pro",
       name: "Pro",
       price_brl: 97.00,
-      max_institutions: 5,
       features: [
-        "5 instituições",
-        "Até 1.000 doações/mês",
-        "Exportação de dados",
+        "Campanhas com meta",
+        "Prestação de contas com parecer",
+        "Exportação DOAR",
         "Suporte por email"
       ]
     },
@@ -28,10 +27,8 @@ module Seeds
       code: "enterprise",
       name: "Enterprise",
       price_brl: 497.00,
-      max_institutions: nil,
       features: [
-        "Instituições ilimitadas",
-        "Doações ilimitadas",
+        "Tudo do Pro",
         "Gerente de conta",
         "SLA de suporte"
       ]
@@ -99,12 +96,25 @@ module Seeds
     )
 
     # A estratégia pix_payout não exige CNPJ, que é o caminho de pessoa física.
-    InstitutionRecord.create!(
+    creator = InstitutionRecord.create!(
       user_record: admin,
       legal_name: "Criador de Conteúdo",
       settlement_strategy: "pix_payout",
       pix_key: "financeiro@criador.com",
       status: "active"
+    )
+
+    # A assinatura é por instituição: cada tenant paga o seu plano. As duas
+    # abaixo pertencem ao mesmo admin, e é exatamente esse o caso que o modelo
+    # anterior não permitia.
+    SubscriptionRecord.create!(
+      institution_record: institution,
+      plan_record: PlanRecord.find_by!(code: "pro")
+    )
+
+    SubscriptionRecord.create!(
+      institution_record: creator,
+      plan_record: PlanRecord.find_by!(code: "free")
     )
 
     DonationRecord.create!(
@@ -115,11 +125,6 @@ module Seeds
       payment_method: "pix",
       reference: "don_seed_0001",
       status: "pending"
-    )
-
-    SubscriptionRecord.create!(
-      user_record: admin,
-      plan_record: PlanRecord.find_by!(code: "enterprise")
     )
 
     puts "admin: #{DEV_ADMIN_EMAIL} / #{DEV_ADMIN_PASSWORD}"

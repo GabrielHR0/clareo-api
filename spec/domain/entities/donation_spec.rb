@@ -3,6 +3,7 @@ require_relative "../../domain_helper"
 RSpec.describe Donation do
   let(:institution) do
     Institution.new(
+      user_id: "user_1",
       id: "ins_1",
       legal_name: "Instituto Semear",
       settlement_strategy: :pix_payout,
@@ -12,6 +13,7 @@ RSpec.describe Donation do
 
   let(:active_institution) do
     Institution.new(
+      user_id: "user_1",
       id: "ins_1",
       legal_name: "Instituto Semear",
       settlement_strategy: :subaccount,
