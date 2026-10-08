@@ -65,4 +65,52 @@ RSpec.describe DonationSplit do
       expect(split.cancellation_reason).to eq(:value_divergence_block)
     end
   end
+
+  describe "transition guards" do
+    it "confirms a blocked split once the divergence is resolved" do
+      split = described_class.for_platform(percentage: 6)
+      split.block!
+
+      split.mark_done!(total_value: "92.13")
+
+      expect(split).to be_done
+    end
+
+    it "refuses to settle an already cancelled split" do
+      split = described_class.for_platform(percentage: 6)
+      split.cancel!(reason: :payment_refunded)
+
+      expect { split.mark_done!(total_value: "92.13") }
+        .to raise_error(InvalidSplit, /from cancelled to done/)
+    end
+
+    it "refuses to cancel a settled split" do
+      split = described_class.for_platform(percentage: 6)
+      split.mark_done!(total_value: "92.13")
+
+      expect { split.cancel! }.to raise_error(InvalidSplit, /from done to cancelled/)
+    end
+
+    it "refuses to settle a settled split twice" do
+      split = described_class.for_platform(percentage: 6)
+      split.mark_done!(total_value: "92.13")
+
+      expect { split.mark_done!(total_value: "92.13") }
+        .to raise_error(InvalidSplit, /from done to done/)
+    end
+
+    it "refuses to block a cancelled split" do
+      split = described_class.for_platform(percentage: 6)
+      split.cancel!(reason: :wallet_unable_to_receive)
+
+      expect { split.block! }.to raise_error(InvalidSplit, /from cancelled to blocked/)
+    end
+
+    it "refuses a cancellation reason outside the known set" do
+      split = described_class.for_platform(percentage: 6)
+
+      expect { split.cancel!(reason: :invented_by_the_caller) }
+        .to raise_error(InvalidSplit, /reason must be one of/)
+    end
+  end
 end

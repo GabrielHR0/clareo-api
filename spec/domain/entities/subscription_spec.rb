@@ -66,4 +66,40 @@ RSpec.describe Subscription do
     expect { described_class.new(id: "sub_1", user_id: "user_1", plan: nil) }
       .to raise_error(InvalidSubscription)
   end
+
+  describe "transition guards" do
+    it "refuses to fall behind once cancelled" do
+      cancelled = subscription.cancel!
+
+      expect { cancelled.mark_past_due! }
+        .to raise_error(InvalidSubscription, /from cancelled to past_due/)
+    end
+
+    it "refuses to fall behind once expired" do
+      expired = subscription(status: :expired)
+
+      expect { expired.mark_past_due! }
+        .to raise_error(InvalidSubscription, /from expired to past_due/)
+    end
+
+    it "refuses to cancel twice" do
+      cancelled = subscription.cancel!
+
+      expect { cancelled.cancel! }
+        .to raise_error(InvalidSubscription, /from cancelled to cancelled/)
+    end
+
+    it "refuses to cancel an expired subscription" do
+      expired = subscription(status: :expired)
+
+      expect { expired.cancel! }
+        .to raise_error(InvalidSubscription, /from expired to cancelled/)
+    end
+
+    it "cancels from past due, because the bill was already outstanding" do
+      delinquent = subscription.mark_past_due!
+
+      expect(delinquent.cancel!.status).to eq(:cancelled)
+    end
+  end
 end

@@ -40,6 +40,13 @@
 11. [Links Oficiais](14-REFERENCIAS.md) — documentação externa
 12. [Roadmap](15-ROADMAP.md) — fases, pendências, o que está fora de escopo
 
+## Diagramas
+
+13. [Diagramas](diagramas/README.md) — PlantUML organizados por tipo: contexto,
+    casos de uso, pacotes, classes, sequência, estados, dados e implantação.
+    As pastas são criadas vazias e os diagramas entram conforme o
+    desenvolvimento avança.
+
 ---
 
 ## As Quatro Decisões que Definem o Produto

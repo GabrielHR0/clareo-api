@@ -33,18 +33,20 @@ class Subscription
     plan.remaining_slots(institution_count)
   end
 
+  # Cancelling is only meaningful while the provider can still charge. Once
+  # cancelled or expired there is nothing left to cancel, and a late webhook
+  # replaying the event must not reopen the subscription.
   def cancel!(at: nil)
-    unless STATUSES.include?(status)
-      raise InvalidSubscription, "status must be one of #{STATUSES.join(', ')}"
-    end
-
-    @status = :cancelled
+    transition_to!(%i[active past_due], :cancelled)
     @cancelled_at = at
     self
   end
 
+  # Only an active subscription can fall behind. A cancelled or expired one
+  # cannot become delinquent: that would grant standing back to a subscription
+  # the provider already closed.
   def mark_past_due!
-    @status = :past_due
+    transition_to!(%i[active], :past_due)
     self
   end
 
@@ -64,5 +66,13 @@ class Subscription
     raise InvalidSubscription, "user is required" if user_id.nil?
     raise InvalidSubscription, "plan is required" if plan.nil?
     raise InvalidSubscription, "status must be one of #{STATUSES.join(', ')}" unless STATUSES.include?(status)
+  end
+
+  def transition_to!(allowed_from, target)
+    unless allowed_from.include?(status)
+      raise InvalidSubscription, "cannot move subscription from #{status} to #{target}"
+    end
+
+    @status = target
   end
 end
