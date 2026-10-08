@@ -3,6 +3,7 @@ require_relative "../../domain_helper"
 RSpec.describe Payout do
   let(:institution) do
     Institution.new(
+      user_id: "user_1",
       id: "ins_1",
       legal_name: "Criador de Conteudo",
       settlement_strategy: :pix_payout,

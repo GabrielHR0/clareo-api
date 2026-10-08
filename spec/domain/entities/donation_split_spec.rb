@@ -3,6 +3,7 @@ require_relative "../../domain_helper"
 RSpec.describe DonationSplit do
   let(:institution) do
     Institution.new(
+      user_id: "user_1",
       id: "ins_1",
       legal_name: "Instituto Semear",
       settlement_strategy: :subaccount,
