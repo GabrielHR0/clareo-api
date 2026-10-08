@@ -24,7 +24,7 @@ e os índices que não são decorativos.
 |--------|-------|
 | `users` | Quem autentica; 1 usuário tem N instituições |
 | `institutions` | Entidade de negócio, com estratégia de liquidação |
-| `plans` | Catálogo, com `max_institutions` |
+| `plans` | Catálogo de planos, sem cota: a assinatura é por instituição |
 | `subscriptions` | 1 ativa por usuário |
 | `donations` | Doação, com `reference` como chave de idempotência |
 | `donation_splits` | Uma linha por perna do rateio |
@@ -36,7 +36,7 @@ e os índices que não são decorativos.
 
 | Índice | Regra |
 |--------|-------|
-| `idx_subscriptions_one_active_per_user` | uma assinatura ativa por usuário |
+| `idx_subscriptions_one_active_per_institution` | uma assinatura ativa por instituição |
 | `idx_payouts_one_per_donation` | um payout por doação — impede pagar a instituição duas vezes |
 | `index_donations_on_reference` | `reference` é a chave de idempotência da cobrança |
 | `index_webhook_events_on_provider_event_id` | entrega de webhook é *at least once* |

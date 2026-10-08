@@ -58,8 +58,9 @@ Usuário                  Clareo                      Asaas
 - `Institution` exige CNPJ, `legal_entity_kind`, `declared_monthly_revenue`,
   e-mail, telefone e endereço completo na estratégia `:subaccount`. Falha aqui,
   no domínio, e não com 400 do provedor.
-- `Subscription#allows_another_institution?` barra o cadastro acima da cota do
-  plano. Assinatura `past_due` ou `cancelled` não abre cota.
+- A assinatura é por instituição, não por usuário: um usuário pode abrir várias
+  instituições, cada uma pagando o seu próprio plano. Assinatura `past_due` ou
+  `cancelled` tira o direito de publicar, mas a instituição continua recebendo.
 - `settlement_strategy` é definida no cadastro e **não tem setter**. Trocá-la com
   dinheiro em jogo não tem reversão segura.
 
@@ -303,7 +304,7 @@ Usuário                  Clareo                      Asaas
   │                        │───────────────────────────>│
   │                        │<───────────────────────────│
   │                        │ 5. Subscription             │
-  │                        │    (1 ativa por usuário)    │
+  │                        │    (1 ativa por instituição)    │
   │                        │                            │
   │                    cobrança recorrente               │
   │                        │      gerada pelo Asaas      │
@@ -317,7 +318,7 @@ Usuário                  Clareo                      Asaas
 
 ### Regra Crítica
 
-Uma assinatura ativa por usuário, garantido por índice parcial único em
+Uma assinatura ativa por instituição, garantido por índice parcial único em
 `subscriptions (user_id) WHERE status = 'active'`. A regra não pode depender só
 da aplicação.
 

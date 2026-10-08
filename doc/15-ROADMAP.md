@@ -67,7 +67,7 @@ Ordem de criação: `users` → `plans` → `institutions` → `subscriptions` �
 - [ ] `ConfirmDonation` — a partir de `ChargeSnapshot` canônico
 - [ ] `BlockDonationSplit` / `UnblockDonationSplit`
 - [ ] `PayOutInstitution` — agrega pendências antes de transferir
-- [ ] `SubscribeUser` — 1 assinatura ativa por usuário
+- [ ] `SubscribeInstitution` — 1 assinatura ativa por instituição
 - [ ] Queries: instituição, balanco pendente, status de webhook
 
 **Aceite:** todos os specs com fakes in-memory, sem HTTP e sem banco.
