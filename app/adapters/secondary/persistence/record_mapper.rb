@@ -222,5 +222,48 @@ id: record.id,
         error_message: record.error_message
       )
     end
+
+    # ---------- Account ----------
+
+    def record_to_account(record)
+      Account.build(
+        institution_id: record.institution_id,
+        code: record.code,
+        name: record.name,
+        nature: record.nature.to_sym,
+        parent_code: record.parent_code,
+        system: record.system
+      )
+    end
+
+    def account_to_record(account, record = nil)
+      record ||= AccountRecord.new
+      record.institution_id = account.institution_id
+      record.code = account.code
+      record.name = account.name
+      record.nature = account.nature.to_s
+      record.parent_code = account.parent_code
+      record.system = account.system
+      record
+    end
+
+    # ---------- CostCenter ----------
+
+    def record_to_cost_center(record)
+      CostCenter.build(
+        id: record.id,
+        institution_id: record.institution_id,
+        code: record.code,
+        name: record.name
+      )
+    end
+
+    def cost_center_to_record(cost_center, record = nil)
+      record ||= CostCenterRecord.new
+      record.institution_id = cost_center.institution_id
+      record.code = cost_center.code
+      record.name = cost_center.name
+      record
+    end
   end
 end

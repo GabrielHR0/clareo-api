@@ -24,6 +24,22 @@ class InstitutionRecord < ApplicationRecord
     inverse_of: :institution_record,
     dependent: :restrict_with_error
 
+  has_many :account_records,
+    class_name: "AccountRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :cost_center_records,
+    class_name: "CostCenterRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+
+
+
+
   SETTLEMENT_STRATEGIES = %w[subaccount pix_payout].freeze
   STATUSES = %w[draft pending_approval active blocked].freeze
   REGISTRATION_STATUSES = %w[unregistered pending approved rejected].freeze

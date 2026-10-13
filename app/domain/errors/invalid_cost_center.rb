@@ -1,0 +1,2 @@
+class InvalidCostCenter < DomainError
+end

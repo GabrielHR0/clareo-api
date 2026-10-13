@@ -1,0 +1,2 @@
+class InvalidAccount < DomainError
+end
