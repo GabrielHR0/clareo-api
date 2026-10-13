@@ -65,4 +65,9 @@ Rails.application.configure do
   #
   # Skip DNS rebinding protection for the default health check endpoint.
   # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+
+  # Comprovante vai para S3. O padrão local assumiria e o upload em massa viraria
+  # um problema silencioso em produção; por isso a ausência de
+  # AMAZONE_S3_BUCKET tem de doer.
+  config.active_storage.service = :amazon
 end

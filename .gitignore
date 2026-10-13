@@ -26,4 +26,10 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
+# Comprovantes enviados em desenvolvimento. O ActiveStorage usa o serviço Disk
+# por padrão, e o blob vai para storage/: versionar arquivo de usuário seria
+# transformar o repositório em backup de PDF.
+/storage/*
+!/storage/.keep
+
 opencode.json
