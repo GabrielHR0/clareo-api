@@ -1,0 +1,2 @@
+class InvalidDocument < DomainError
+end

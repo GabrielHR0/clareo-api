@@ -266,6 +266,36 @@ id: record.id,
       record
     end
 
+    # ---------- Document ----------
+
+    def record_to_document(record)
+      Document.build(
+        id: record.id,
+        institution_id: record.institution_id,
+        target: DocumentTarget.build(
+          ledger_entry_id: record.ledger_entry_id,
+          post_id: record.post_id
+        ),
+        kind: record.kind.to_sym,
+        kind_detail: record.kind_detail,
+        number: record.number,
+        issued_on: record.issued_on
+      )
+    end
+
+    def document_to_record(document, record = nil)
+      record ||= DocumentRecord.new
+      record.institution_id = document.institution_id
+      record.attachable_type = document.attachable_type
+      record.ledger_entry_id = document.target.ledger_entry_id
+      record.post_id = document.target.post_id
+      record.kind = document.kind.to_s
+      record.kind_detail = document.kind_detail
+      record.number = document.number
+      record.issued_on = document.issued_on
+      record
+    end
+
     # ---------- LedgerEntry ----------
 
     def record_to_ledger_entry(record)
