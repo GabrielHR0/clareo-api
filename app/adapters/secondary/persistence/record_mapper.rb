@@ -328,5 +328,32 @@ id: record.id,
       record.published_at = post.published_at
       record
     end
+
+    # ---------- Campaign ----------
+
+    def record_to_campaign(record)
+      Campaign.build(
+        id: record.id,
+        institution_id: record.institution_id,
+        title: record.title,
+        description: record.description,
+        goal: record.goal_brl,
+        starts_on: record.starts_on,
+        ends_on: record.ends_on,
+        status: record.status.to_sym
+      )
+    end
+
+    def campaign_to_record(campaign, record = nil)
+      record ||= CampaignRecord.new
+      record.institution_id = campaign.institution_id
+      record.title = campaign.title
+      record.description = campaign.description
+      record.goal_brl = campaign.goal.amount
+      record.starts_on = campaign.starts_on
+      record.ends_on = campaign.ends_on
+      record.status = campaign.status.to_s
+      record
+    end
   end
 end

@@ -1,0 +1,2 @@
+class InvalidCampaign < DomainError
+end
