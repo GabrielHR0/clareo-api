@@ -303,5 +303,30 @@ id: record.id,
       record.posted_on = entry.posted_on
       record
     end
+
+    # ---------- Post ----------
+
+    def record_to_post(record)
+      Post.build(
+        id: record.id,
+        institution_id: record.institution_id,
+        title: record.title,
+        content: record.content,
+        post_type: record.post_type.to_sym,
+        status: record.status.to_sym,
+        published_at: record.published_at
+      )
+    end
+
+    def post_to_record(post, record = nil)
+      record ||= PostRecord.new
+      record.institution_id = post.institution_id
+      record.title = post.title
+      record.content = post.content
+      record.post_type = post.post_type.to_s
+      record.status = post.status.to_s
+      record.published_at = post.published_at
+      record
+    end
   end
 end

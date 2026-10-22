@@ -1,0 +1,2 @@
+class InvalidPost < DomainError
+end

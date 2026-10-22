@@ -43,6 +43,12 @@ class InstitutionRecord < ApplicationRecord
     inverse_of: :institution_record,
     dependent: :restrict_with_error
 
+  has_many :post_records,
+    class_name: "PostRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
 
   SETTLEMENT_STRATEGIES = %w[subaccount pix_payout].freeze
   STATUSES = %w[draft pending_approval active blocked].freeze
