@@ -13,6 +13,12 @@ class DonationSplitRecord < ApplicationRecord
 
   validate :institution_only_on_institution_recipient
 
+  has_many :ledger_entry_records,
+    class_name: "LedgerEntryRecord",
+    foreign_key: :donation_split_id,
+    inverse_of: :donation_split_record,
+    dependent: :restrict_with_error
+
   scope :routable, -> { where(recipient: "institution") }
 
   private

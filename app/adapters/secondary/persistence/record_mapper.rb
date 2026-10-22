@@ -265,5 +265,43 @@ id: record.id,
       record.name = cost_center.name
       record
     end
+
+    # ---------- LedgerEntry ----------
+
+    def record_to_ledger_entry(record)
+      LedgerEntry.new(
+        id: record.id,
+        institution_id: record.institution_id,
+        account_id: record.account_id,
+        cost_center_id: record.cost_center_id,
+        campaign_id: record.campaign_id,
+        kind: record.kind.to_sym,
+        origin: record.origin.to_sym,
+        amount: record.amount_brl,
+        description: record.description,
+        status: record.status.to_sym,
+        donation_split_id: record.donation_split_id,
+        void_reason: record.void_reason,
+        posted_on: record.posted_on,
+        immutable: record.system?
+      )
+    end
+
+    def ledger_entry_to_record(entry, record = nil)
+      record ||= LedgerEntryRecord.new
+      record.institution_id = entry.institution_id
+      record.account_id = entry.account_id
+      record.cost_center_id = entry.cost_center_id
+      record.campaign_id = entry.campaign_id
+      record.kind = entry.kind.to_s
+      record.origin = entry.origin.to_s
+      record.amount_brl = entry.amount.amount
+      record.description = entry.description
+      record.status = entry.status.to_s
+      record.donation_split_id = entry.donation_split_id
+      record.void_reason = entry.void_reason
+      record.posted_on = entry.posted_on
+      record
+    end
   end
 end

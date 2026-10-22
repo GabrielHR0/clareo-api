@@ -37,7 +37,11 @@ class InstitutionRecord < ApplicationRecord
     dependent: :restrict_with_error
 
 
-
+  has_many :ledger_entry_records,
+    class_name: "LedgerEntryRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
 
 
   SETTLEMENT_STRATEGIES = %w[subaccount pix_payout].freeze

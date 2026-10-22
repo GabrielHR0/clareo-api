@@ -18,6 +18,7 @@ DOMAIN_FILES = %w[
   errors/invalid_subscription
   errors/invalid_account
   errors/invalid_cost_center
+  errors/invalid_ledger_entry
   value_objects/money
   value_objects/percentage
   value_objects/cpf_cnpj
@@ -37,6 +38,7 @@ DOMAIN_FILES = %w[
   entities/webhook_event
   entities/account
   entities/cost_center
+  entities/ledger_entry
   services/split_policy
   services/settlement_plan
   services/account_template
