@@ -40,6 +40,30 @@ Núcleo de negócio puro. Zero dependência de Rails ou do provedor.
 
 ---
 
+## Fase 1.5 - Transparência (vertical slice)
+
+Primeira entrega ponta a ponta sobre o modelo multi-tenant. Não substitui as
+fases 2-4; antecipa o caminho que o produto precisa para publicar contas.
+
+- [x] Perfil público: `description`, `slug` imutável e `public_profile_ready?`
+- [x] Campanha no post e no razão com FK composta por instituição
+- [x] Documento com visibilidade pública opt-in e alvo exclusivo
+- [x] `AccountabilityReport` com snapshot, revisão e publicação
+- [x] `FinancialSummary` derivado de `ledger_entries.posted`
+- [x] Migrations com checks, índices e FKs compostas
+- [x] Repositório de relatório com snapshot transacional
+- [x] Casos de uso `BuildReport`, `SubmitReport`, `ReviewReport`, `PublishReport`
+- [x] Consultas públicas de perfil, feed, campanha e relatórios
+- [x] API autenticada de escrita e API pública de leitura
+- [x] Auth JWT HS256 com logout por `jti` revogado
+- [x] Suíte completa verde; RuboCop e zeitwerk limpos
+
+**Aceite:** instituição ativa cria rascunho a partir do razão, envia, a
+plataforma revisa, a instituição publica e o relatório aparece no perfil
+público com apenas documentos marcados como públicos.
+
+---
+
 ## Fase 2 — Persistência
 
 ActiveRecord como adapter secundário. Nada entra no domínio.

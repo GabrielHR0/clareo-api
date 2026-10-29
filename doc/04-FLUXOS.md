@@ -331,7 +331,7 @@ de assinatura não faz sentido.
 ## Fluxo 7: Autenticação
 
 ```
-Cliente                  Clareo                      Redis
+Cliente                  Clareo                      Cache
   │                        │                            │
   │ 1. POST /auth/login    │                            │
   │───────────────────────>│                            │
@@ -409,3 +409,53 @@ ser fisicamente impossível.
 **Reprocessar revalida estado.** Um evento antigo reprocessado pode encontrar a
 entidade já atualizada por um evento mais novo. A regra precisa checar o estado
 atual antes de agir de novo.
+
+---
+
+## Fluxo 9: Prestação de contas e publicação
+
+O relatório não é digitado: ele é uma fotografia do razão `posted`.
+
+```
+Instituição              Clareo                     Admin
+  | 1. POST reports       |                          |
+  |    período/campanha ->|                          |
+  |                       | 2. lista ledger posted   |
+  |                       |    e cria snapshot       |
+  |<- 201 draft ----------|                          |
+  |                       |                          |
+  | 3. POST submit ------>|                          |
+  |                       | 4. refaz snapshot        |
+  |                       |    (declaração final)    |
+  |<- 200 submitted ------|                          |
+  |                       |                          |
+  |                       |<---- 5. start_review ----|
+  |                       |--- 200 under_review ---->|
+  |                       |<---- 6. approve ---------|
+  |                       |--- 200 approved -------->|
+  | 7. POST publish ----->|                          |
+  |<- 200 published ------|                          |
+  |                       |                          |
+Doador/Público            |                          |
+  | GET /public/... ----->| 8. só published + docs   |
+  |<- perfil/relatório ---|    marcados públicos     |
+```
+
+**O submit refaz o snapshot.** Um lançamento que entrou depois do rascunho passa
+a contar; um estornado sai. A instituição não escolhe manualmente linhas do
+relatório.
+
+**O banco também protege o tenant.** As FKs compostas impedem que uma entrada
+aponte para relatório, lançamento ou campanha de outra instituição mesmo se a
+aplicação falhar.
+
+**Revisão é ato da plataforma.** `start_review`, `approve` e `request_changes`
+exigem `platform_admin`. O pedido de alteração deixa notas visíveis no detalhe e
+devolve o relatório para `changes_requested`.
+
+**Publicado é imutável.** Correção de um relatório publicado é um novo
+relatório; o anterior continua sendo o que foi aprovado.
+
+**Documento privado não vaza.** A consulta pública junta o snapshot com apenas
+`documents.public = true`; um comprovante privado ligado a um lançamento do
+relatório não aparece.

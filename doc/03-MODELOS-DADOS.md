@@ -1,7 +1,10 @@
 # Clareo — Modelos de Dados
 
-> 9 tabelas. `donations`, `donation_splits` e `payouts` são o espelho local do
-> que o Asaas registra, e existem para reconciliação.
+> O núcleo de pagamentos tem 9 tabelas. `donations`, `donation_splits` e
+> `payouts` são o espelho local do que o Asaas registra, e existem para
+> reconciliação. As tabelas de transparência (`campaigns`, `posts`, `documents`,
+> `accounts`, `ledger_entries`, `accountability_reports` e
+> `accountability_report_entries`) completam o modelo multi-tenant.
 
 ## Tabela: `users`
 
@@ -326,6 +329,68 @@ CREATE INDEX idx_audit_logs_user_id ON audit_logs (user_id);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at);
 ```
 
+## Transparência e razão
+
+Tabelas novas ou ampliadas para o perfil público, o razão e a prestação de
+contas. Todas carregam `institution_id`; o vínculo entre entidades do mesmo
+tenant é garantido por FK composta, não só por validação de aplicação.
+
+| Tabela | Papel |
+|--------|-------|
+| `campaigns` | campanha com meta; `status` é `active`, `paused` ou `closed` |
+| `posts` | narrativa do feed; `campaign_id` opcional |
+| `documents` | comprovante ligado a exatamente um `ledger_entry` ou `post`; `public` é opt-in |
+| `accounts` | plano de contas por instituição |
+| `ledger_entries` | razão; `posted` é a fonte dos números públicos |
+| `accountability_reports` | cabeçalho e ciclo de revisão do relatório |
+| `accountability_report_entries` | snapshot congelado de cada lançamento no relatório |
+
+### Constraints que importam
+
+```sql
+-- slug público: único, minúsculo e imutável depois de atribuído
+CREATE UNIQUE INDEX idx_institutions_slug ON institutions (LOWER(slug))
+  WHERE slug IS NOT NULL;
+
+ALTER TABLE posts
+  ADD CONSTRAINT fk_posts_campaign_same_institution
+  FOREIGN KEY (campaign_id, institution_id)
+  REFERENCES campaigns (id, institution_id);
+
+ALTER TABLE ledger_entries
+  ADD CONSTRAINT fk_ledger_entries_campaign_same_institution
+  FOREIGN KEY (campaign_id, institution_id)
+  REFERENCES campaigns (id, institution_id);
+
+ALTER TABLE accountability_reports
+  ADD CONSTRAINT fk_accountability_reports_campaign_same_institution
+  FOREIGN KEY (campaign_id, institution_id)
+  REFERENCES campaigns (id, institution_id);
+
+ALTER TABLE accountability_report_entries
+  ADD CONSTRAINT fk_report_entries_report_same_institution
+  FOREIGN KEY (accountability_report_id, institution_id)
+  REFERENCES accountability_reports (id, institution_id);
+
+ALTER TABLE accountability_report_entries
+  ADD CONSTRAINT fk_report_entries_ledger_same_institution
+  FOREIGN KEY (ledger_entry_id, institution_id)
+  REFERENCES ledger_entries (id, institution_id);
+```
+
+O relatório também tem checks de coerência de estado: período ordenado,
+`published_at` em `published`, `approved_at` em `approved/published`,
+`submitted_at` a partir de `submitted`, revisor em `under_review` e parecer em
+`approved/published`.
+
+**O snapshot não é cache.** `accountability_report_entries` copia código e nome
+da conta, campanha, descrição, data e valor. Se o plano de contas ou a campanha
+mudar depois, o relatório publicado continua contando a história que foi
+aprovada.
+
+**Documento é privado por padrão.** A rota pública só inclui `documents.public =
+true`; a checagem é feita na consulta, não no serializer.
+
 ## Relacionamentos
 
 ```
@@ -341,6 +406,13 @@ institutions ──┬── donations (1:N)
 donations ──┬── donation_splits (1:N)
             └── payouts (0:1)
 ```
+
+institutions -> campaigns (1:N) -> posts (1:N)
+institutions -> accounts (1:N) -> ledger_entries (1:N)
+institutions -> ledger_entries (1:N) -> accountability_report_entries (1:N)
+institutions -> accountability_reports (1:N) -> accountability_report_entries (1:N)
+ledger_entries -> documents (0:N, alvo)
+posts -> documents (0:N, alvo)
 
 ## Tabelas que Não Existem Mais
 
@@ -409,3 +481,16 @@ rails generate migration CreateAuditLogs action:string entity_type:string \
 
 As constraints e índices parciais devem ser adicionados em migrations separadas
 ou ao final das migrations de criação — o gerador não os produz.
+
+Migrations de transparência (2026-10-28):
+
+```
+20261028000001_add_public_profile_to_institutions
+20261028000002_add_campaign_to_posts
+20261028000003_add_public_to_documents
+20261028000004_create_accountability_reports
+20261028000005_create_accountability_report_entries
+```
+
+Todas foram aplicadas em `test` e `development`. Em outro ambiente, rode
+`bin/rails db:migrate` antes de subir a aplicação.

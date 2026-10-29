@@ -6,7 +6,7 @@ https://api.clareo.com.br/api/v1
 
 ## Convenções
 
-Todos os endpoints, exceto login, cadastro e webhook, exigem:
+Todos os endpoints, exceto login, cadastro, webhook e rotas `/public/*`, exigem:
 
 ```
 Authorization: Bearer <token>
@@ -19,8 +19,8 @@ Formato de erro, uniforme em toda a API:
 ```
 
 Erros de domínio (`InvalidDonation`, `InvalidInstitution`, `InvalidSplit`,
-`InvalidSubscription`) mapeiam para `422`. Erro de autenticação, `401` ou `403`.
-Recurso inexistente, `404`.
+`InvalidSubscription`, `InvalidAccountabilityReport`) mapeiam para `422`.
+Erro de autenticação, `401` ou `403`. Recurso inexistente, `404`.
 
 | Código | Uso |
 |--------|-----|
@@ -45,7 +45,7 @@ Recurso inexistente, `404`.
 { "email": "joao@example.com", "password": "senha123" }
 ```
 
-**201** / **200**
+**200**
 
 ```json
 {
@@ -79,7 +79,7 @@ depois e vincular.
 
 ### POST /auth/logout
 
-Invalida o token no Redis. **204**.
+Invalida o `jti` do token em `Rails.cache` (Solid Cache em produção). **204**.
 
 ---
 
@@ -442,6 +442,98 @@ Reprocessar revalida o estado atual da entidade antes de agir — um evento anti
 pode encontrar a entidade já atualizada.
 
 **202**
+
+---
+
+## Transparência
+
+O relatório de prestação de contas nasce como snapshot do razão `posted`. Depois
+do `submit` as entradas não mudam; correção de relatório publicado é um novo
+relatório. O ciclo é `draft -> submitted -> under_review -> approved ->
+published`, com retorno `changes_requested -> submitted`.
+
+### POST /institutions/:institution_id/accountability_reports
+
+Cria o rascunho já com os lançamentos do período. Requer `platform_admin` ou o
+dono da instituição; a instituição precisa estar `active`.
+
+```json
+{
+  "title": "Prestação de contas de janeiro",
+  "summary": "Recursos recebidos e aplicados no período.",
+  "period_start": "2026-01-01",
+  "period_end": "2026-01-31",
+  "campaign_id": 1
+}
+```
+
+**201** - `{ "accountability_report": { ... } }`, com `entries` e totais.
+
+### GET /institutions/:institution_id/accountability_reports
+
+Lista os relatórios da instituição. Query opcional: `status`. **200**.
+
+### GET /institutions/:institution_id/accountability_reports/:id
+
+Detalhe com entradas, totais e parecer/revisão. **200**; **404** se o relatório
+não for da instituição.
+
+### PATCH /institutions/:institution_id/accountability_reports/:id
+
+Edita título, resumo, período e campanha enquanto o relatório está em `draft`
+ou `changes_requested`. O snapshot é atualizado para o novo recorte. **200**;
+**422** depois do `submit`.
+
+### POST /institutions/:institution_id/accountability_reports/:id/submit
+
+Refaz o snapshot do período e envia para revisão. Exige `summary` e ao menos um
+lançamento; caso contrário **422**. **200**.
+
+### POST /institutions/:institution_id/accountability_reports/:id/publish
+
+Publica um relatório `approved` de instituição `active`. **200**.
+
+### GET /admin/accountability_reports
+
+Fila de revisão (`submitted`/`under_review`), somente `platform_admin`. Query:
+`limit`, `offset`. **200**.
+
+### POST /admin/accountability_reports/:id/start_review
+
+Assume a revisão (`submitted -> under_review`). **200**.
+
+### POST /admin/accountability_reports/:id/approve
+
+```json
+{ "opinion": "Documentação conferida" }
+```
+
+Aprova o relatório (`under_review -> approved`). **200**.
+
+### POST /admin/accountability_reports/:id/request_changes
+
+```json
+{ "notes": "Anexar o comprovante da despesa X." }
+```
+
+Devolve para a instituição (`under_review -> changes_requested`). As notas
+aparecem no detalhe do relatório. **200**.
+
+### Rotas públicas
+
+Não exigem token. Só aparecem instituições com perfil público pronto
+(`active` + `slug`), campanhas não pausadas e relatórios `published`.
+
+| Método | Caminho | Retorno |
+|--------|---------|---------|
+| GET | `/public/institutions/:slug` | instituição, resumo financeiro e campanhas |
+| GET | `/public/institutions/:slug/feed` | posts publicados; query `campaign_id`, `limit`, `offset` |
+| GET | `/public/institutions/:slug/campaigns/:id` | campanha, resumo e relatórios publicados |
+| GET | `/public/institutions/:slug/accountability_reports` | relatórios publicados; query `campaign_id`, `limit`, `offset` |
+| GET | `/public/accountability_reports/:id` | snapshot do relatório e documentos marcados como públicos |
+
+Documento privado nunca é incluído na resposta pública, mesmo que o lançamento
+apareça no relatório.
 
 ---
 
