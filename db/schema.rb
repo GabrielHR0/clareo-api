@@ -10,9 +10,65 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "accountability_report_entries", force: :cascade do |t|
+    t.string "account_code", null: false
+    t.bigint "account_id", null: false
+    t.string "account_name", null: false
+    t.bigint "accountability_report_id", null: false
+    t.decimal "amount_brl", precision: 15, scale: 2, null: false
+    t.bigint "campaign_id"
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.bigint "institution_id", null: false
+    t.string "kind", null: false
+    t.bigint "ledger_entry_id", null: false
+    t.string "origin", null: false
+    t.date "posted_on", null: false
+    t.datetime "updated_at", null: false
+    t.index ["accountability_report_id", "ledger_entry_id"], name: "idx_report_entries_one_per_ledger_entry", unique: true
+    t.index ["campaign_id"], name: "index_accountability_report_entries_on_campaign_id"
+    t.index ["institution_id", "posted_on"], name: "idx_on_institution_id_posted_on_fcccadc943"
+    t.index ["ledger_entry_id"], name: "index_accountability_report_entries_on_ledger_entry_id"
+    t.check_constraint "amount_brl >= 0::numeric", name: "accountability_report_entries_amount_check"
+    t.check_constraint "kind::text = ANY (ARRAY['income'::character varying, 'expense'::character varying]::text[])", name: "accountability_report_entries_kind_check"
+    t.check_constraint "origin::text = ANY (ARRAY['donation'::character varying, 'declared'::character varying]::text[])", name: "accountability_report_entries_origin_check"
+  end
+
+  create_table "accountability_reports", force: :cascade do |t|
+    t.datetime "approved_at"
+    t.bigint "campaign_id"
+    t.datetime "created_at", null: false
+    t.bigint "institution_id", null: false
+    t.date "period_end", null: false
+    t.date "period_start", null: false
+    t.datetime "published_at"
+    t.text "review_notes"
+    t.text "review_opinion"
+    t.datetime "review_started_at"
+    t.bigint "reviewer_id"
+    t.string "status", default: "draft", null: false
+    t.datetime "submitted_at"
+    t.text "summary"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id", "period_end"], name: "index_accountability_reports_on_campaign_id_and_period_end"
+    t.index ["id", "institution_id"], name: "idx_accountability_reports_id_institution", unique: true
+    t.index ["institution_id", "campaign_id", "period_start", "period_end"], name: "idx_accountability_reports_period"
+    t.index ["institution_id", "status"], name: "index_accountability_reports_on_institution_id_and_status"
+    t.index ["published_at"], name: "index_accountability_reports_on_published_at"
+    t.index ["status", "submitted_at"], name: "index_accountability_reports_on_status_and_submitted_at"
+    t.check_constraint "(status::text <> ALL (ARRAY['approved'::character varying, 'published'::character varying]::text[])) OR approved_at IS NOT NULL", name: "accountability_reports_approved_at_check"
+    t.check_constraint "(status::text <> ALL (ARRAY['approved'::character varying, 'published'::character varying]::text[])) OR review_opinion IS NOT NULL", name: "accountability_reports_opinion_check"
+    t.check_constraint "(status::text <> ALL (ARRAY['submitted'::character varying, 'under_review'::character varying, 'approved'::character varying, 'changes_requested'::character varying, 'published'::character varying]::text[])) OR submitted_at IS NOT NULL", name: "accountability_reports_submitted_at_check"
+    t.check_constraint "period_end >= period_start", name: "accountability_reports_period_check"
+    t.check_constraint "status::text <> 'published'::text OR published_at IS NOT NULL", name: "accountability_reports_published_at_check"
+    t.check_constraint "status::text <> 'under_review'::text OR reviewer_id IS NOT NULL", name: "accountability_reports_reviewer_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'submitted'::character varying, 'under_review'::character varying, 'approved'::character varying, 'changes_requested'::character varying, 'published'::character varying]::text[])", name: "accountability_reports_status_check"
+  end
 
   create_table "accounts", force: :cascade do |t|
     t.boolean "active", default: true, null: false
@@ -82,6 +138,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.string "status", default: "active", null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
+    t.index ["id", "institution_id"], name: "idx_campaigns_id_institution", unique: true
     t.index ["institution_id", "ends_on"], name: "index_campaigns_on_institution_id_and_ends_on"
     t.index ["institution_id", "status"], name: "index_campaigns_on_institution_id_and_status"
     t.check_constraint "ends_on >= starts_on", name: "campaigns_period_check"
@@ -110,9 +167,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.bigint "ledger_entry_id"
     t.string "number"
     t.bigint "post_id"
+    t.boolean "public", default: false, null: false
     t.datetime "updated_at", null: false
     t.index ["institution_id", "issued_on"], name: "index_documents_on_institution_id_and_issued_on"
     t.index ["institution_id", "kind"], name: "index_documents_on_institution_id_and_kind"
+    t.index ["institution_id", "public"], name: "index_documents_on_institution_id_and_public"
     t.index ["ledger_entry_id"], name: "index_documents_on_ledger_entry_id"
     t.index ["post_id"], name: "index_documents_on_post_id"
     t.check_constraint "kind::text = 'outro'::text AND kind_detail IS NOT NULL AND length(btrim(kind_detail::text)) > 0 OR kind::text <> 'outro'::text AND kind_detail IS NULL", name: "documents_kind_detail_check"
@@ -136,8 +195,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.index ["status"], name: "index_donation_splits_on_status"
     t.check_constraint "percentage > 0::numeric AND percentage <= 100::numeric", name: "donation_splits_percentage_check"
     t.check_constraint "recipient::text = 'institution'::text AND institution_id IS NOT NULL OR recipient::text = 'platform'::text AND institution_id IS NULL", name: "donation_splits_recipient_institution"
-    t.check_constraint "recipient::text = ANY (ARRAY['institution'::character varying::text, 'platform'::character varying::text])", name: "donation_splits_recipient_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'done'::character varying::text, 'cancelled'::character varying::text, 'blocked'::character varying::text])", name: "donation_splits_status_check"
+    t.check_constraint "recipient::text = ANY (ARRAY['institution'::character varying, 'platform'::character varying]::text[])", name: "donation_splits_recipient_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'done'::character varying, 'cancelled'::character varying, 'blocked'::character varying]::text[])", name: "donation_splits_status_check"
   end
 
   create_table "donations", force: :cascade do |t|
@@ -165,8 +224,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.index ["status"], name: "index_donations_on_status"
     t.check_constraint "amount_brl > 0::numeric", name: "donations_amount_positive"
     t.check_constraint "net_amount_brl IS NULL OR net_amount_brl >= 0::numeric", name: "donations_net_amount_check"
-    t.check_constraint "payment_method::text = ANY (ARRAY['pix'::character varying::text, 'boleto'::character varying::text, 'credit_card'::character varying::text])", name: "donations_payment_method_check"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'received'::character varying::text, 'refunded'::character varying::text, 'cancelled'::character varying::text, 'rejected'::character varying::text, 'split_blocked'::character varying::text])", name: "donations_status_check"
+    t.check_constraint "payment_method::text = ANY (ARRAY['pix'::character varying, 'boleto'::character varying, 'credit_card'::character varying]::text[])", name: "donations_payment_method_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'received'::character varying, 'refunded'::character varying, 'cancelled'::character varying, 'rejected'::character varying, 'split_blocked'::character varying]::text[])", name: "donations_status_check"
   end
 
   create_table "institutions", force: :cascade do |t|
@@ -182,27 +241,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.string "contact_email"
     t.datetime "created_at", null: false
     t.decimal "declared_monthly_revenue", precision: 15, scale: 2
+    t.text "description"
     t.string "legal_entity_kind"
     t.string "legal_name", null: false
     t.string "mobile_phone"
     t.string "pix_key"
     t.string "registration_status", default: "unregistered", null: false
     t.string "settlement_strategy", null: false
+    t.string "slug"
     t.string "status", default: "draft", null: false
     t.string "trade_name"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index "lower((slug)::text)", name: "idx_institutions_slug", unique: true, where: "(slug IS NOT NULL)"
     t.index ["asaas_wallet_id"], name: "index_institutions_on_asaas_wallet_id"
     t.index ["cnpj"], name: "index_institutions_on_cnpj", unique: true
     t.index ["settlement_strategy"], name: "index_institutions_on_settlement_strategy"
     t.index ["status"], name: "index_institutions_on_status"
     t.index ["user_id"], name: "index_institutions_on_user_id"
-    t.check_constraint "registration_status::text = ANY (ARRAY['unregistered'::character varying::text, 'pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text])", name: "institutions_registration_check"
+    t.check_constraint "registration_status::text = ANY (ARRAY['unregistered'::character varying, 'pending'::character varying, 'approved'::character varying, 'rejected'::character varying]::text[])", name: "institutions_registration_check"
     t.check_constraint "settlement_strategy::text <> 'pix_payout'::text OR pix_key IS NOT NULL", name: "institutions_pix_payout_needs_key"
     t.check_constraint "settlement_strategy::text <> 'subaccount'::text OR cnpj IS NOT NULL", name: "institutions_subaccount_needs_cnpj"
     t.check_constraint "settlement_strategy::text <> 'subaccount'::text OR declared_monthly_revenue IS NOT NULL", name: "institutions_subaccount_needs_revenue"
-    t.check_constraint "settlement_strategy::text = ANY (ARRAY['subaccount'::character varying::text, 'pix_payout'::character varying::text])", name: "institutions_strategy_check"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'pending_approval'::character varying::text, 'active'::character varying::text, 'blocked'::character varying::text])", name: "institutions_status_check"
+    t.check_constraint "settlement_strategy::text = ANY (ARRAY['subaccount'::character varying, 'pix_payout'::character varying]::text[])", name: "institutions_strategy_check"
+    t.check_constraint "slug IS NULL OR slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "institutions_slug_format_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'pending_approval'::character varying, 'active'::character varying, 'blocked'::character varying]::text[])", name: "institutions_status_check"
   end
 
   create_table "ledger_entries", force: :cascade do |t|
@@ -224,6 +287,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.index ["campaign_id"], name: "index_ledger_entries_on_campaign_id"
     t.index ["cost_center_id"], name: "index_ledger_entries_on_cost_center_id"
     t.index ["donation_split_id"], name: "idx_ledger_entries_one_per_donation_split", unique: true, where: "((origin)::text = 'donation'::text)"
+    t.index ["id", "institution_id"], name: "idx_ledger_entries_id_institution", unique: true
     t.index ["institution_id", "kind"], name: "index_ledger_entries_on_institution_id_and_kind"
     t.index ["institution_id", "posted_on"], name: "index_ledger_entries_on_institution_id_and_posted_on"
     t.index ["institution_id", "status"], name: "index_ledger_entries_on_institution_id_and_status"
@@ -254,7 +318,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.index ["provider_transfer_id"], name: "index_payouts_on_provider_transfer_id"
     t.index ["status"], name: "index_payouts_on_status"
     t.check_constraint "amount_brl > 0::numeric", name: "payouts_amount_positive"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'processing'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "payouts_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])", name: "payouts_status_check"
   end
 
   create_table "plans", force: :cascade do |t|
@@ -265,11 +329,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.decimal "price_brl", precision: 10, scale: 2, default: "0.0", null: false
     t.datetime "updated_at", null: false
     t.index ["code"], name: "index_plans_on_code", unique: true
-    t.check_constraint "code::text = ANY (ARRAY['free'::character varying::text, 'pro'::character varying::text, 'enterprise'::character varying::text])", name: "plans_code_check"
+    t.check_constraint "code::text = ANY (ARRAY['free'::character varying, 'pro'::character varying, 'enterprise'::character varying]::text[])", name: "plans_code_check"
     t.check_constraint "price_brl >= 0::numeric", name: "plans_price_check"
   end
 
   create_table "posts", force: :cascade do |t|
+    t.bigint "campaign_id"
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.bigint "institution_id", null: false
@@ -278,6 +343,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.string "status", default: "published", null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_posts_on_campaign_id"
     t.index ["institution_id", "post_type"], name: "index_posts_on_institution_id_and_post_type"
     t.index ["institution_id", "published_at"], name: "index_posts_on_institution_id_and_published_at"
     t.index ["institution_id", "status"], name: "index_posts_on_institution_id_and_status"
@@ -298,7 +364,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.index ["institution_id"], name: "idx_subscriptions_one_active_per_institution", unique: true, where: "((status)::text = 'active'::text)"
     t.index ["institution_id"], name: "index_subscriptions_on_institution_id"
     t.index ["plan_id"], name: "index_subscriptions_on_plan_id"
-    t.check_constraint "status::text = ANY (ARRAY['active'::character varying::text, 'past_due'::character varying::text, 'cancelled'::character varying::text, 'expired'::character varying::text])", name: "subscriptions_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['active'::character varying, 'past_due'::character varying, 'cancelled'::character varying, 'expired'::character varying]::text[])", name: "subscriptions_status_check"
   end
 
   create_table "users", force: :cascade do |t|
@@ -310,7 +376,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.datetime "updated_at", null: false
     t.index "lower((email)::text)", name: "idx_users_email", unique: true
     t.index ["role"], name: "index_users_on_role"
-    t.check_constraint "role::text = ANY (ARRAY['donor'::character varying::text, 'institution_admin'::character varying::text, 'platform_admin'::character varying::text])", name: "users_role_check"
+    t.check_constraint "role::text = ANY (ARRAY['donor'::character varying, 'institution_admin'::character varying, 'platform_admin'::character varying]::text[])", name: "users_role_check"
   end
 
   create_table "webhook_events", force: :cascade do |t|
@@ -330,9 +396,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
     t.index ["provider_event_id"], name: "index_webhook_events_on_provider_event_id", unique: true
     t.index ["resource_type", "resource_id"], name: "idx_webhook_events_resource"
     t.index ["status"], name: "index_webhook_events_on_status"
-    t.check_constraint "status::text = ANY (ARRAY['received'::character varying::text, 'processing'::character varying::text, 'processed'::character varying::text, 'failed'::character varying::text])", name: "webhook_events_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['received'::character varying, 'processing'::character varying, 'processed'::character varying, 'failed'::character varying]::text[])", name: "webhook_events_status_check"
   end
 
+  add_foreign_key "accountability_report_entries", "accountability_reports", column: ["accountability_report_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_report_same_institution"
+  add_foreign_key "accountability_report_entries", "accounts"
+  add_foreign_key "accountability_report_entries", "campaigns"
+  add_foreign_key "accountability_report_entries", "institutions"
+  add_foreign_key "accountability_report_entries", "ledger_entries", column: ["ledger_entry_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_ledger_same_institution"
+  add_foreign_key "accountability_reports", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_accountability_reports_campaign_same_institution"
+  add_foreign_key "accountability_reports", "institutions"
+  add_foreign_key "accountability_reports", "users", column: "reviewer_id"
   add_foreign_key "accounts", "institutions"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
@@ -349,10 +423,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000013) do
   add_foreign_key "institutions", "users"
   add_foreign_key "ledger_entries", "accounts"
   add_foreign_key "ledger_entries", "campaigns"
+  add_foreign_key "ledger_entries", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_campaign_same_institution"
   add_foreign_key "ledger_entries", "donation_splits"
   add_foreign_key "ledger_entries", "institutions"
   add_foreign_key "payouts", "donations"
   add_foreign_key "payouts", "institutions"
+  add_foreign_key "posts", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_posts_campaign_same_institution"
   add_foreign_key "posts", "institutions"
   add_foreign_key "subscriptions", "institutions"
   add_foreign_key "subscriptions", "plans"

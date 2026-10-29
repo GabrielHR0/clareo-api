@@ -34,9 +34,14 @@ class DocumentRecord < ApplicationRecord
 
   scope :other, -> { where(kind: OTHER) }
   scope :typed, -> { where.not(kind: OTHER) }
+  scope :publicly_visible, -> { where(public: true) }
 
   def other?
     kind == OTHER
+  end
+
+  def public?
+    self[:public]
   end
 
   private

@@ -27,8 +27,15 @@ class LedgerEntryRecord < ApplicationRecord
   scope :declared, -> { where(origin: "declared") }
   scope :from_donations, -> { where(origin: "donation") }
   scope :in_period, ->(from, to) { where(posted_on: from..to) }
+  scope :for_campaign, ->(campaign_id) { where(campaign_id: campaign_id) }
 
   has_many :document_records,
+    foreign_key: :ledger_entry_id,
+    inverse_of: :ledger_entry_record,
+    dependent: :restrict_with_error
+
+  has_many :accountability_report_entry_records,
+    class_name: "AccountabilityReportEntryRecord",
     foreign_key: :ledger_entry_id,
     inverse_of: :ledger_entry_record,
     dependent: :restrict_with_error

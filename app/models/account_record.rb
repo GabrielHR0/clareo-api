@@ -11,6 +11,12 @@ class AccountRecord < ApplicationRecord
     inverse_of: :account_record,
     dependent: :restrict_with_error
 
+  has_many :accountability_report_entry_records,
+    class_name: "AccountabilityReportEntryRecord",
+    foreign_key: :account_id,
+    inverse_of: :account_record,
+    dependent: :restrict_with_error
+
   NATURES = %w[income expense].freeze
 
   validates :code, presence: true, uniqueness: { scope: :institution_id }

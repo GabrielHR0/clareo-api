@@ -19,6 +19,12 @@ class UserRecord < ApplicationRecord
     inverse_of: :user_record,
     dependent: :destroy
 
+  has_many :reviewed_accountability_report_records,
+    class_name: "AccountabilityReportRecord",
+    foreign_key: :reviewer_id,
+    inverse_of: :reviewer,
+    dependent: :nullify
+
   ROLES = %w[donor institution_admin platform_admin].freeze
 
   validates :email, presence: true,

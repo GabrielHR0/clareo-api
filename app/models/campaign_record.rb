@@ -22,6 +22,18 @@ class CampaignRecord < ApplicationRecord
     inverse_of: :campaign_record,
     dependent: :nullify
 
+  has_many :post_records,
+    class_name: "PostRecord",
+    foreign_key: :campaign_id,
+    inverse_of: :campaign_record,
+    dependent: :nullify
+
+  has_many :accountability_report_records,
+    class_name: "AccountabilityReportRecord",
+    foreign_key: :campaign_id,
+    inverse_of: :campaign_record,
+    dependent: :nullify
+
   # Deliberadamente sem current_amount e sem amount_raised: os dois são
   # derivados dos lançamentos. Cache aqui dessincroniza quando um split é
   # estornado, e a campanha passa a anunciar um valor que não existe mais.
