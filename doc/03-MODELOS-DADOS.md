@@ -378,6 +378,33 @@ ALTER TABLE accountability_report_entries
   REFERENCES ledger_entries (id, institution_id);
 ```
 
+A migration `20261029000001_enforce_tenant_integrity` fechou o restante do mapa
+com FKs compostas para todas as relações entre entidades do mesmo tenant:
+
+| Origem | Referência composta |
+|--------|---------------------|
+| `ledger_entries` | `accounts (id, institution_id)` |
+| `ledger_entries` | `cost_centers (id, institution_id)` |
+| `ledger_entries` | `donation_splits (id, institution_id)` |
+| `donations` | `campaigns (id, institution_id)` |
+| `donation_splits` | `donations (id, institution_id)` |
+| `payouts` | `donations (id, institution_id)` |
+| `documents` | `ledger_entries (id, institution_id)` |
+| `documents` | `posts (id, institution_id)` |
+| `accountability_report_entries` | `accounts (id, institution_id)` |
+| `accountability_report_entries` | `campaigns (id, institution_id)` |
+| `accounts` | `accounts (institution_id, code)` para `parent_code` |
+
+Cada tabela referenciada ganhou o índice único `(id, institution_id)` que o
+PostgreSQL exige para a FK composta. A garantia vale no banco: um INSERT/UPDATE
+cruzando instituições falha mesmo que a autenticação, a autorização ou o
+repositório sejam contornados.
+
+Os repositórios também escopam a escrita: um agregado com id existente só é
+carregado por `(id, institution_id)`. Isso impede que um id de outro tenant seja
+usado para sobrescrever campanha, post, documento, lançamento, relatório,
+doação, repasse ou assinatura.
+
 O relatório também tem checks de coerência de estado: período ordenado,
 `published_at` em `published`, `approved_at` em `approved/published`,
 `submitted_at` a partir de `submitted`, revisor em `under_review` e parecer em
@@ -490,6 +517,7 @@ Migrations de transparência (2026-10-28):
 20261028000003_add_public_to_documents
 20261028000004_create_accountability_reports
 20261028000005_create_accountability_report_entries
+20261029000001_enforce_tenant_integrity
 ```
 
 Todas foram aplicadas em `test` e `development`. Em outro ambiente, rode

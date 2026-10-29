@@ -83,7 +83,9 @@ erro mais caro possível: usar chave de sandbox em produção.
 
 ## Webhook: Validação Antes de Persistir
 
-O endpoint de webhook é entrada externa. É a única rota sem JWT.
+O endpoint de webhook é entrada externa. Ele e as rotas
+`/api/v1/public/...` não usam JWT; nas públicas, o que autoriza é o estado do
+recurso (instituição ativa, campanha ativa e relatório publicado), não o token.
 
 ```ruby
 # O endpoint só faz três coisas: validar, persistir, responder.
@@ -154,6 +156,20 @@ end
 
 Um `institution_admin` com JWT válido não pode ler a doação de outra
 instituição. A checagem é sempre sobre o recurso, não só sobre o token.
+
+### Isolamento abaixo da autenticação
+
+A autenticação não é a última linha de defesa do tenant. As relações entre
+entidades da mesma instituição são FKs compostas no PostgreSQL, por exemplo
+`(account_id, institution_id)` em `ledger_entries` e
+`(donation_id, institution_id)` em `donation_splits`. Um id de outro tenant não
+encontra a chave composta e o banco recusa o INSERT/UPDATE.
+
+Os repositórios de escrita carregam o registro existente por
+`(id, institution_id)`, não apenas por `id`, e devolvem `RecordNotFound` quando
+o id pertence a outra instituição. A cobertura está em
+`spec/persistence/tenant_integrity_spec.rb` e nos specs de persistência, que
+exercitam o banco sem passar por JWT.
 
 Endpoints sensíveis exigem `platform_admin`:
 
