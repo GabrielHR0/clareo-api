@@ -29,6 +29,7 @@ class AccountabilityReportRecord < ApplicationRecord
   validates :title, presence: true
   validates :status, inclusion: { in: STATUSES }
   validate :period_is_ordered
+  validate :campaign_belongs_to_institution
 
   scope :published, -> { where(status: "published") }
   scope :not_draft, -> { where.not(status: "draft") }
@@ -47,6 +48,12 @@ class AccountabilityReportRecord < ApplicationRecord
   def period_is_ordered
     if period_start.present? && period_end.present? && period_end < period_start
       errors.add(:period_end, "cannot be before period_start")
+    end
+  end
+
+  def campaign_belongs_to_institution
+    if campaign_record && campaign_record.institution_id != institution_id
+      errors.add(:campaign_id, "must belong to the same institution")
     end
   end
 end

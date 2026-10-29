@@ -70,7 +70,10 @@ module Persistence
       def record_for(report)
         return AccountabilityReportRecord.new if report.id.nil?
 
-        AccountabilityReportRecord.find_by(id: report.id) || AccountabilityReportRecord.new
+        AccountabilityReportRecord.find_by!(
+          id: report.id,
+          institution_id: report.institution_id
+        )
       end
 
       def sync_entries!(record, entries)

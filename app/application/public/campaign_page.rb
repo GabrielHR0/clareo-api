@@ -16,9 +16,11 @@ module Public
       institution = find_public_institution(slug)
       return nil if institution.nil?
 
-      campaign = @campaign_repository.find(campaign_id)
+      campaign = @campaign_repository.find_for_institution(
+        id: campaign_id,
+        institution_id: institution.id
+      )
       return nil if campaign.nil?
-      return nil unless campaign.institution_id == institution.id
       return nil if campaign.paused?
 
       {

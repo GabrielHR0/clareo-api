@@ -51,7 +51,10 @@ module Persistence
     def record_for(donation)
       return DonationRecord.new if donation.id.nil?
 
-      DonationRecord.find_by(id: donation.id) || DonationRecord.new
+      DonationRecord.find_by!(
+        id: donation.id,
+        institution_id: donation.institution.id
+      )
     end
 
     def preload(conditions)

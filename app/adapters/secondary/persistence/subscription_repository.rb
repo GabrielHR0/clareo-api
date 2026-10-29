@@ -14,7 +14,11 @@ module Persistence
     end
 
     def save(subscription)
-      record = SubscriptionRecord.find_by(id: subscription.id) || SubscriptionRecord.new
+      record = if subscription.id.nil?
+        SubscriptionRecord.new
+      else
+        SubscriptionRecord.find_by!(id: subscription.id, institution_id: subscription.institution_id)
+      end
       record.institution_id = subscription.institution_id
       record.plan_id = plan_record_for(subscription.plan).id
       record.asaas_subscription_id = subscription.provider_subscription_id

@@ -46,7 +46,11 @@ module Persistence
     end
 
     def save(document)
-      record = DocumentRecord.find_or_initialize_by(id: document.id)
+      record = if document.id.nil?
+        DocumentRecord.new
+      else
+        DocumentRecord.find_by!(id: document.id, institution_id: document.institution_id)
+      end
       RecordMapper.document_to_record(document, record)
       record.save!
       RecordMapper.record_to_document(record)

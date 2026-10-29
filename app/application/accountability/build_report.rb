@@ -47,8 +47,11 @@ module Accountability
       def validate_campaign!(campaign_id, institution_id)
         return if campaign_id.nil?
 
-        campaign = @campaign_repository.find(campaign_id)
-        return if campaign&.institution_id == institution_id
+        campaign = @campaign_repository.find_for_institution(
+          id: campaign_id,
+          institution_id: institution_id
+        )
+        return if campaign
 
         raise InvalidAccountabilityReport, "campaign does not belong to the institution"
       end

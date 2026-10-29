@@ -15,7 +15,11 @@ module Persistence
     end
 
     def save(post)
-      record = PostRecord.find_or_initialize_by(id: post.id)
+      record = if post.id.nil?
+        PostRecord.new
+      else
+        PostRecord.find_by!(id: post.id, institution_id: post.institution_id)
+      end
       RecordMapper.post_to_record(post, record)
       record.save!
       RecordMapper.record_to_post(record)

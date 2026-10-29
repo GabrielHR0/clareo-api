@@ -31,6 +31,7 @@ class AccountabilityReportEntryRecord < ApplicationRecord
   validates :origin, inclusion: { in: ORIGINS }
   validates :account_code, :account_name, :posted_on, presence: true
   validates :amount_brl, numericality: { greater_than_or_equal_to: 0 }
+  validate :references_belong_to_institution
 
   def income?
     kind == "income"
@@ -38,5 +39,26 @@ class AccountabilityReportEntryRecord < ApplicationRecord
 
   def expense?
     kind == "expense"
+  end
+
+  private
+
+  def references_belong_to_institution
+    if accountability_report_record &&
+       accountability_report_record.institution_id != institution_id
+      errors.add(:accountability_report_id, "must belong to the same institution")
+    end
+
+    if ledger_entry_record && ledger_entry_record.institution_id != institution_id
+      errors.add(:ledger_entry_id, "must belong to the same institution")
+    end
+
+    if account_record && account_record.institution_id != institution_id
+      errors.add(:account_id, "must belong to the same institution")
+    end
+
+    if campaign_record && campaign_record.institution_id != institution_id
+      errors.add(:campaign_id, "must belong to the same institution")
+    end
   end
 end

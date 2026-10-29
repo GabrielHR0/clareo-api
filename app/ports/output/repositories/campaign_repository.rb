@@ -8,6 +8,11 @@ class CampaignRepository
     raise NotImplementedError
   end
 
+  # @return [Campaign, nil] só a campanha da instituição informada
+  def find_for_institution(id:, institution_id:)
+    raise NotImplementedError
+  end
+
   # @return [Array<Campaign>] o feed público: só as ativas
   def list_in_feed(institution_id)
     raise NotImplementedError

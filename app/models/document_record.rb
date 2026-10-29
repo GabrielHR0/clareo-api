@@ -31,6 +31,7 @@ class DocumentRecord < ApplicationRecord
   validates :kind, inclusion: { in: KINDS }
   validate :exactly_one_attachable
   validate :kind_detail_matches_kind
+  validate :target_belongs_to_institution
 
   scope :other, -> { where(kind: OTHER) }
   scope :typed, -> { where.not(kind: OTHER) }
@@ -67,6 +68,16 @@ class DocumentRecord < ApplicationRecord
       end
     elsif kind_detail.present?
       errors.add(:kind_detail, "is only allowed when kind is outro")
+    end
+  end
+
+  def target_belongs_to_institution
+    if ledger_entry_record && ledger_entry_record.institution_id != institution_id
+      errors.add(:ledger_entry_id, "must belong to the same institution")
+    end
+
+    if post_record && post_record.institution_id != institution_id
+      errors.add(:post_id, "must belong to the same institution")
     end
   end
 end

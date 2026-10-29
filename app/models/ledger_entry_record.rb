@@ -4,6 +4,7 @@ class LedgerEntryRecord < ApplicationRecord
   belongs_to :institution_record, foreign_key: :institution_id, inverse_of: :ledger_entry_records
   belongs_to :account_record, foreign_key: :account_id, inverse_of: :ledger_entry_records
   belongs_to :campaign_record, foreign_key: :campaign_id, inverse_of: :ledger_entries, optional: true
+  belongs_to :cost_center_record, foreign_key: :cost_center_id, optional: true
   belongs_to :donation_split_record,
     foreign_key: :donation_split_id,
     inverse_of: :ledger_entry_records,
@@ -20,6 +21,7 @@ class LedgerEntryRecord < ApplicationRecord
 
   validate :void_reason_present_when_voided
   validate :donation_entries_are_immutable
+  validate :references_belong_to_institution
 
   scope :posted, -> { where(status: "posted") }
   scope :income, -> { where(kind: "income") }
@@ -67,6 +69,24 @@ class LedgerEntryRecord < ApplicationRecord
          will_save_change_to_campaign_id?
         errors.add(:base, "a donation entry cannot be rewritten")
       end
+    end
+  end
+
+  def references_belong_to_institution
+    if account_record && account_record.institution_id != institution_id
+      errors.add(:account_id, "must belong to the same institution")
+    end
+
+    if cost_center_record && cost_center_record.institution_id != institution_id
+      errors.add(:cost_center_id, "must belong to the same institution")
+    end
+
+    if campaign_record && campaign_record.institution_id != institution_id
+      errors.add(:campaign_id, "must belong to the same institution")
+    end
+
+    if donation_split_record && donation_split_record.institution_id != institution_id
+      errors.add(:donation_split_id, "must belong to the same institution")
     end
   end
 end

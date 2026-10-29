@@ -45,7 +45,11 @@ module Persistence
     end
 
     def save(entry)
-      record = LedgerEntryRecord.find_by(id: entry.id) || LedgerEntryRecord.new
+      record = if entry.id.nil?
+        LedgerEntryRecord.new
+      else
+        LedgerEntryRecord.find_by!(id: entry.id, institution_id: entry.institution_id)
+      end
       RecordMapper.ledger_entry_to_record(entry, record)
       record.save!
       RecordMapper.record_to_ledger_entry(record)

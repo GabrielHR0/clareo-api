@@ -6,6 +6,11 @@ module Persistence
       record && RecordMapper.record_to_campaign(record)
     end
 
+    def find_for_institution(id:, institution_id:)
+      record = CampaignRecord.find_by(id: id, institution_id: institution_id)
+      record && RecordMapper.record_to_campaign(record)
+    end
+
     def list_in_feed(institution_id)
       CampaignRecord.in_feed.where(institution_id: institution_id).map do |record|
         RecordMapper.record_to_campaign(record)
@@ -19,7 +24,11 @@ module Persistence
     end
 
     def save(campaign)
-      record = CampaignRecord.find_or_initialize_by(id: campaign.id)
+      record = if campaign.id.nil?
+        CampaignRecord.new
+      else
+        CampaignRecord.find_by!(id: campaign.id, institution_id: campaign.institution_id)
+      end
       RecordMapper.campaign_to_record(campaign, record)
       record.save!
       RecordMapper.record_to_campaign(record)
