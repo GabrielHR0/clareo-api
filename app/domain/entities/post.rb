@@ -10,15 +10,16 @@ class Post
 
   STATUSES = %i[published hidden].freeze
 
-  attr_reader :id, :institution_id, :title, :content, :post_type, :status,
-              :published_at
+  attr_reader :id, :institution_id, :campaign_id, :title, :content, :post_type,
+              :status, :published_at
 
   class << self
     def build(institution_id:, title:, content:, post_type: :update,
-              published_at: nil, status: :published, id: nil)
+              campaign_id: nil, published_at: nil, status: :published, id: nil)
       new(
         id: id,
         institution_id: institution_id,
+        campaign_id: campaign_id,
         title: title,
         content: content,
         post_type: post_type,
@@ -29,9 +30,10 @@ class Post
   end
 
   def initialize(id: nil, institution_id:, title:, content:, post_type: :update,
-                 status: :published, published_at: nil)
+                 campaign_id: nil, status: :published, published_at: nil)
     @id = id
     @institution_id = institution_id
+    @campaign_id = campaign_id
     @title = presence(title, "title")
     @content = presence(content, "content")
     @post_type = post_type.to_sym
@@ -39,6 +41,10 @@ class Post
     @published_at = published_at
 
     validate!
+  end
+
+  def campaign?
+    !campaign_id.nil?
   end
 
   def published?

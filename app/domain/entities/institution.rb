@@ -3,11 +3,13 @@ class Institution
   LEGAL_ENTITY_KINDS = %i[mei ltda mei_eire association].freeze
   STATUSES = %i[draft pending_approval active blocked].freeze
   REGISTRATION_STATUSES = %i[unregistered pending approved rejected].freeze
+  SLUG_FORMAT = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
 
   attr_reader :id, :user_id, :legal_name, :trade_name, :cnpj,
               :legal_entity_kind, :declared_monthly_revenue, :contact_email,
               :mobile_phone, :address, :pix_key, :settlement_strategy,
-              :asaas_account_id, :asaas_wallet_id, :registration_status, :status
+              :asaas_account_id, :asaas_wallet_id, :registration_status, :status,
+              :description, :slug
 
   # user_id é o dono: quem abriu e quem administra. Não é a assinatura — a
   # assinatura é desta instituição e vive em Subscription, uma por tenant.
@@ -17,11 +19,13 @@ class Institution
                  contact_email: nil, mobile_phone: nil, address: nil,
                  pix_key: nil, trade_name: nil, asaas_account_id: nil,
                  asaas_wallet_id: nil, registration_status: :unregistered,
-                 status: :draft)
+                 status: :draft, description: nil, slug: nil)
     @id = id
     @user_id = user_id
     @legal_name = legal_name
     @trade_name = trade_name
+    @description = normalize_optional(description)
+    @slug = normalize_slug(slug)
     @cnpj = wrap_cpf_cnpj(cnpj)
     @legal_entity_kind = legal_entity_kind
     @declared_monthly_revenue = wrap_money(declared_monthly_revenue)
@@ -65,6 +69,33 @@ class Institution
 
   def registration_approved?
     registration_status == :approved
+  end
+
+  # O perfil público existe quando a instituição está ativa e já tem um slug
+  # estável. O slug não muda depois de atribuído: link público quebrado é pior
+  # do que nome desatualizado.
+  def public_profile_ready?
+    active? && !slug.nil?
+  end
+
+  def update_profile!(description:, trade_name: nil)
+    @description = normalize_optional(description)
+    @trade_name = normalize_optional(trade_name)
+    validate!
+    self
+  end
+
+  def assign_slug!(value)
+    normalized = normalize_slug(value)
+    raise InvalidInstitution, "slug is required" if normalized.nil?
+
+    if !slug.nil? && slug != normalized
+      raise InvalidInstitution, "slug cannot change after it is set"
+    end
+
+    @slug = normalized
+    validate!
+    self
   end
 
   def active?
@@ -123,6 +154,7 @@ class Institution
       validate_strategy!
       validate_status!
       validate_registration_status!
+      validate_slug!
       validate_subaccount_requirements!
       validate_pix_payout_requirements!
     end
@@ -145,6 +177,13 @@ class Institution
       return if REGISTRATION_STATUSES.include?(registration_status)
 
       raise InvalidInstitution, "registration status must be one of #{REGISTRATION_STATUSES.join(', ')}"
+    end
+
+    def validate_slug!
+      return if slug.nil?
+      return if slug.match?(SLUG_FORMAT)
+
+      raise InvalidInstitution, "slug must contain only lowercase letters, numbers and hyphens"
     end
 
     # The provider only accepts legal entities with a declared monthly revenue and
@@ -181,6 +220,23 @@ class Institution
       end
 
       @status = target
+    end
+
+    def normalize_optional(value)
+      return nil if value.nil?
+
+      text = value.to_s.strip
+      text.empty? ? nil : text
+    end
+
+    def normalize_slug(value)
+      return nil if value.nil?
+
+      text = value.to_s.strip.downcase
+        .gsub(/[^a-z0-9]+/, "-")
+        .gsub(/\A-+|-+\z/, "")
+
+      text.empty? ? nil : text
     end
 
     def wrap_cpf_cnpj(value)

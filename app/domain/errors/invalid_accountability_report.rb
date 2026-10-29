@@ -1,0 +1,2 @@
+class InvalidAccountabilityReport < DomainError
+end

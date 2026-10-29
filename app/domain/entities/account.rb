@@ -11,8 +11,9 @@ class Account
   attr_reader :id, :institution_id, :code, :name, :nature, :parent_code, :system
 
   class << self
-    def build(institution_id:, code:, name:, nature:, parent_code: nil, system: false)
+    def build(institution_id:, code:, name:, nature:, parent_code: nil, system: false, id: nil)
       new(
+        id: id,
         institution_id: institution_id,
         code: code,
         name: name,
@@ -23,7 +24,8 @@ class Account
     end
   end
 
-  def initialize(institution_id:, code:, name:, nature:, parent_code: nil, system: false)
+  def initialize(institution_id:, code:, name:, nature:, parent_code: nil, system: false, id: nil)
+    @id = id
     @institution_id = institution_id
     @code = normalize_code(code)
     @name = presence(name, "name")

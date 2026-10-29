@@ -31,7 +31,7 @@ class Document
 
   class << self
     def build(institution_id:, target:, kind:, kind_detail: nil, number: nil,
-              issued_on: nil, id: nil)
+              issued_on: nil, public: false, id: nil)
       new(
         id: id,
         institution_id: institution_id,
@@ -39,13 +39,14 @@ class Document
         kind: kind,
         kind_detail: kind_detail,
         number: number,
-        issued_on: issued_on
+        issued_on: issued_on,
+        public: public
       )
     end
   end
 
   def initialize(id: nil, institution_id:, target:, kind:,
-                 kind_detail: nil, number: nil, issued_on: nil)
+                 kind_detail: nil, number: nil, issued_on: nil, public: false)
     @id = id
     @institution_id = institution_id
     @target = target.is_a?(DocumentTarget) ? target : DocumentTarget.build(target)
@@ -53,8 +54,15 @@ class Document
     @kind_detail = kind_detail.nil? ? nil : kind_detail.to_s.strip
     @number = number.nil? ? nil : number.to_s.strip
     @issued_on = issued_on
+    @public = public == true
 
     validate!
+  end
+
+  # O comprovante é privado por padrão. Expor nota fiscal ou recibo com dado
+  # pessoal é decisão explícita da instituição, não efeito colateral do feed.
+  def public?
+    @public
   end
 
   def other?

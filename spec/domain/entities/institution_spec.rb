@@ -153,4 +153,44 @@ RSpec.describe Institution do
       expect(pix_payout.withdraws_on_its_own?).to be(false)
     end
   end
+
+  describe "public profile" do
+    it "normalizes a slug to lowercase hyphenated words" do
+      institution = subaccount(slug: "  Instituto Semear  ")
+
+      expect(institution.slug).to eq("instituto-semear")
+    end
+
+    it "requires a valid slug when one is explicitly assigned" do
+      expect { subaccount.assign_slug!("!!!") }
+        .to raise_error(InvalidInstitution, /slug/)
+    end
+
+    it "sanitizes punctuation and spaces into a stable slug" do
+      expect(subaccount(slug: "Instituto Semear!").slug).to eq("instituto-semear")
+    end
+
+    it "does not change an existing slug" do
+      institution = subaccount(slug: "instituto-semear")
+
+      expect { institution.assign_slug!("outro-slug") }
+        .to raise_error(InvalidInstitution, /cannot change/)
+
+      expect(institution.assign_slug!("instituto-semear").slug).to eq("instituto-semear")
+    end
+
+    it "is public only when active and carrying a slug" do
+      expect(subaccount(status: :active, slug: "instituto-semear")).to be_public_profile_ready
+      expect(subaccount(status: :draft, slug: "instituto-semear")).not_to be_public_profile_ready
+      expect(subaccount(status: :active)).not_to be_public_profile_ready
+    end
+
+    it "updates only the public narrative and display name" do
+      institution = subaccount.tap { |record| record.assign_slug!("instituto-semear") }
+      institution.update_profile!(description: "  Nossa causa  ", trade_name: "Semear")
+
+      expect(institution.description).to eq("Nossa causa")
+      expect(institution.trade_name).to eq("Semear")
+    end
+  end
 end
