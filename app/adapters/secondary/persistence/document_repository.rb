@@ -10,14 +10,12 @@ module Persistence
     end
 
     def list_for_attachable(institution_id:, attachable_type:, attachable_id:)
-      scope = DocumentRecord.where(institution_id: institution_id)
-
-      scope =
-        case attachable_type
-        when DocumentTarget::LEDGER_ENTRY then scope.where(ledger_entry_id: attachable_id)
-        when DocumentTarget::POST then scope.where(post_id: attachable_id)
-        else return []
-        end
+      scope = scope_for_attachable(
+        DocumentRecord.where(institution_id: institution_id),
+        attachable_type: attachable_type,
+        attachable_id: attachable_id
+      )
+      return [] if scope.nil?
 
       scope.order(:issued_on, :id).map { |record| RecordMapper.record_to_document(record) }
     end
@@ -28,11 +26,39 @@ module Persistence
       end
     end
 
+    def list_public_for_attachable(institution_id:, attachable_type:, attachable_id:)
+      scope = scope_for_attachable(
+        DocumentRecord.publicly_visible.where(institution_id: institution_id),
+        attachable_type: attachable_type,
+        attachable_id: attachable_id
+      )
+      return [] if scope.nil?
+
+      scope.order(:issued_on, :id).map { |record| RecordMapper.record_to_document(record) }
+    end
+
+    def list_public_for_ledger_entries(institution_id:, ledger_entry_ids:)
+      DocumentRecord
+        .publicly_visible
+        .where(institution_id: institution_id, ledger_entry_id: ledger_entry_ids)
+        .order(:issued_on, :id)
+        .map { |record| RecordMapper.record_to_document(record) }
+    end
+
     def save(document)
       record = DocumentRecord.find_or_initialize_by(id: document.id)
       RecordMapper.document_to_record(document, record)
       record.save!
       RecordMapper.record_to_document(record)
     end
+
+    private
+
+      def scope_for_attachable(scope, attachable_type:, attachable_id:)
+        case attachable_type.to_s
+        when DocumentTarget::LEDGER_ENTRY then scope.where(ledger_entry_id: attachable_id)
+        when DocumentTarget::POST then scope.where(post_id: attachable_id)
+        end
+      end
   end
 end

@@ -18,6 +18,16 @@ class DocumentRepository
     raise NotImplementedError
   end
 
+  # @return [Array<Document>] só os documentos que a instituição optou por expor
+  def list_public_for_attachable(institution_id:, attachable_type:, attachable_id:)
+    raise NotImplementedError
+  end
+
+  # @return [Array<Document>] anexos públicos do lançamento, em lote
+  def list_public_for_ledger_entries(institution_id:, ledger_entry_ids:)
+    raise NotImplementedError
+  end
+
   def save(document)
     raise NotImplementedError
   end

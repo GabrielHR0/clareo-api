@@ -6,8 +6,9 @@ module Persistence
       record && RecordMapper.record_to_post(record)
     end
 
-    def list_feed(institution_id, limit: nil, offset: nil)
+    def list_feed(institution_id, campaign_id: nil, limit: nil, offset: nil)
       scope = PostRecord.in_feed.where(institution_id: institution_id)
+      scope = scope.for_campaign(campaign_id) if campaign_id
       scope = scope.limit(limit) if limit
       scope = scope.offset(offset) if offset
       scope.map { |record| RecordMapper.record_to_post(record) }

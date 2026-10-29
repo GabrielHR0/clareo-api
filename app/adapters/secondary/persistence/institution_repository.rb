@@ -11,6 +11,11 @@ module Persistence
       record && RecordMapper.record_to_institution(record)
     end
 
+    def find_by_slug(slug)
+      record = InstitutionRecord.find_by(slug: slug.to_s.downcase)
+      record && RecordMapper.record_to_institution(record)
+    end
+
     def list_by_user(user_id)
       InstitutionRecord.where(user_id: user_id).order(:id).map do |record|
         RecordMapper.record_to_institution(record)

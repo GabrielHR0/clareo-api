@@ -23,6 +23,8 @@ module Persistence
       record.contact_email = institution.contact_email
       record.mobile_phone = institution.mobile_phone
       record.pix_key = institution.pix_key&.to_s
+      record.description = institution.description
+      record.slug = institution.slug
 
       if institution.address
         record.address_street = institution.address.street
@@ -57,7 +59,9 @@ module Persistence
         asaas_account_id: record.asaas_account_id,
         asaas_wallet_id: record.asaas_wallet_id,
         registration_status: record.registration_status.to_sym,
-        status: record.status.to_sym
+        status: record.status.to_sym,
+        description: record.description,
+        slug: record.slug
       )
     end
 
@@ -227,6 +231,7 @@ id: record.id,
 
     def record_to_account(record)
       Account.build(
+        id: record.id,
         institution_id: record.institution_id,
         code: record.code,
         name: record.name,
@@ -279,7 +284,8 @@ id: record.id,
         kind: record.kind.to_sym,
         kind_detail: record.kind_detail,
         number: record.number,
-        issued_on: record.issued_on
+        issued_on: record.issued_on,
+        public: record.public?
       )
     end
 
@@ -293,6 +299,7 @@ id: record.id,
       record.kind_detail = document.kind_detail
       record.number = document.number
       record.issued_on = document.issued_on
+      record.public = document.public?
       record
     end
 
@@ -340,6 +347,7 @@ id: record.id,
       Post.build(
         id: record.id,
         institution_id: record.institution_id,
+        campaign_id: record.campaign_id,
         title: record.title,
         content: record.content,
         post_type: record.post_type.to_sym,
@@ -351,11 +359,89 @@ id: record.id,
     def post_to_record(post, record = nil)
       record ||= PostRecord.new
       record.institution_id = post.institution_id
+      record.campaign_id = post.campaign_id
       record.title = post.title
       record.content = post.content
       record.post_type = post.post_type.to_s
       record.status = post.status.to_s
       record.published_at = post.published_at
+      record
+    end
+
+    # ---------- AccountabilityReport ----------
+
+    def record_to_accountability_report(record, entries: nil)
+      AccountabilityReport.build(
+        id: record.id,
+        institution_id: record.institution_id,
+        campaign_id: record.campaign_id,
+        title: record.title,
+        summary: record.summary,
+        period_start: record.period_start,
+        period_end: record.period_end,
+        status: record.status.to_sym,
+        submitted_at: record.submitted_at,
+        review_started_at: record.review_started_at,
+        approved_at: record.approved_at,
+        published_at: record.published_at,
+        reviewer_id: record.reviewer_id,
+        review_opinion: record.review_opinion,
+        review_notes: record.review_notes,
+        entries: entries || record.entry_records.map { |entry| record_to_accountability_report_entry(entry) }
+      )
+    end
+
+    # As entradas não são gravadas aqui: o repositório decide quando trocá-las,
+    # porque o snapshot só pode mudar enquanto o relatório é editável.
+    def accountability_report_to_record(report, record = nil)
+      record ||= AccountabilityReportRecord.new
+      record.institution_id = report.institution_id
+      record.campaign_id = report.campaign_id
+      record.title = report.title
+      record.summary = report.summary
+      record.period_start = report.period_start
+      record.period_end = report.period_end
+      record.status = report.status.to_s
+      record.submitted_at = report.submitted_at
+      record.review_started_at = report.review_started_at
+      record.approved_at = report.approved_at
+      record.published_at = report.published_at
+      record.reviewer_id = report.reviewer_id
+      record.review_opinion = report.review_opinion
+      record.review_notes = report.review_notes
+      record
+    end
+
+    def record_to_accountability_report_entry(record)
+      AccountabilityReportEntry.build(
+        institution_id: record.institution_id,
+        ledger_entry_id: record.ledger_entry_id,
+        account_id: record.account_id,
+        account_code: record.account_code,
+        account_name: record.account_name,
+        campaign_id: record.campaign_id,
+        kind: record.kind.to_sym,
+        origin: record.origin.to_sym,
+        posted_on: record.posted_on,
+        description: record.description,
+        amount: record.amount_brl
+      )
+    end
+
+    def accountability_report_entry_to_record(entry, report_id:, record: nil)
+      record ||= AccountabilityReportEntryRecord.new
+      record.institution_id = entry.institution_id
+      record.accountability_report_id = report_id
+      record.ledger_entry_id = entry.ledger_entry_id
+      record.account_id = entry.account_id
+      record.campaign_id = entry.campaign_id
+      record.kind = entry.kind.to_s
+      record.origin = entry.origin.to_s
+      record.account_code = entry.account_code
+      record.account_name = entry.account_name
+      record.description = entry.description
+      record.posted_on = entry.posted_on
+      record.amount_brl = entry.amount.amount
       record
     end
 

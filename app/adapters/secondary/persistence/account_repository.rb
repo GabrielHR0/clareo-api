@@ -6,6 +6,18 @@ module Persistence
       record && RecordMapper.record_to_account(record)
     end
 
+    def find_by_id(institution_id:, id:)
+      record = AccountRecord.find_by(institution_id: institution_id, id: id)
+      record && RecordMapper.record_to_account(record)
+    end
+
+    def find_by_ids(institution_id:, ids:)
+      AccountRecord
+        .where(institution_id: institution_id, id: ids)
+        .order(:code)
+        .map { |record| RecordMapper.record_to_account(record) }
+    end
+
     def list_by_institution(institution_id)
       AccountRecord.where(institution_id: institution_id).order(:code).map do |record|
         RecordMapper.record_to_account(record)

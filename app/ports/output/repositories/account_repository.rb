@@ -8,6 +8,16 @@ class AccountRepository
     raise NotImplementedError
   end
 
+  # @return [Account, nil] busca pelo id, sempre limitada ao tenant
+  def find_by_id(institution_id:, id:)
+    raise NotImplementedError
+  end
+
+  # @return [Array<Account>] busca em lote, para montar snapshots sem N+1
+  def find_by_ids(institution_id:, ids:)
+    raise NotImplementedError
+  end
+
   # @return [Array<Account>] todas as contas, ativas ou não
   def list_by_institution(institution_id)
     raise NotImplementedError

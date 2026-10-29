@@ -13,13 +13,14 @@ class LedgerEntryRepository
   end
 
   # @return [Array<LedgerEntry>] lançamentos de um período, por data de caixa
-  def list_in_period(institution_id, from:, to:)
+  def list_in_period(institution_id, from:, to:, campaign_id: nil)
     raise NotImplementedError
   end
 
-  # @return [Money] soma das receitas de sistema no período. É o que o sistema
-  #   sabe que entrou, contra o que a instituição declarou.
-  def declared_income_total(institution_id, from:, to:)
+  # @return [FinancialSummary] receitas de doação, receitas declaradas e
+  #   despesas do período. Uma única leitura evita totais que não fecham entre si.
+  #   Sem from/to, considera todo o histórico do recorte.
+  def financial_summary(institution_id, from: nil, to: nil, campaign_id: nil)
     raise NotImplementedError
   end
 
