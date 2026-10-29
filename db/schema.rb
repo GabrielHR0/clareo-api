@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_29_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -80,6 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
     t.string "parent_code"
     t.boolean "system", default: false, null: false
     t.datetime "updated_at", null: false
+    t.index ["id", "institution_id"], name: "idx_accounts_id_institution", unique: true
     t.index ["institution_id", "code"], name: "index_accounts_on_institution_id_and_code", unique: true
     t.index ["institution_id", "nature"], name: "index_accounts_on_institution_id_and_nature"
     t.index ["institution_id", "parent_code"], name: "index_accounts_on_institution_id_and_parent_code"
@@ -153,6 +154,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
     t.bigint "institution_id", null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
+    t.index ["id", "institution_id"], name: "idx_cost_centers_id_institution", unique: true
     t.index ["institution_id", "active"], name: "index_cost_centers_on_institution_id_and_active"
     t.index ["institution_id", "code"], name: "index_cost_centers_on_institution_id_and_code", unique: true
   end
@@ -191,6 +193,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
     t.decimal "total_value_brl", precision: 15, scale: 2
     t.datetime "updated_at", null: false
     t.index ["donation_id"], name: "index_donation_splits_on_donation_id"
+    t.index ["id", "institution_id"], name: "idx_donation_splits_id_institution", unique: true
     t.index ["institution_id"], name: "index_donation_splits_on_institution_id"
     t.index ["status"], name: "index_donation_splits_on_status"
     t.check_constraint "percentage > 0::numeric AND percentage <= 100::numeric", name: "donation_splits_percentage_check"
@@ -219,6 +222,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
     t.index ["campaign_id"], name: "index_donations_on_campaign_id"
     t.index ["created_at"], name: "index_donations_on_created_at"
     t.index ["donor_email"], name: "index_donations_on_donor_email"
+    t.index ["id", "institution_id"], name: "idx_donations_id_institution", unique: true
     t.index ["institution_id"], name: "index_donations_on_institution_id"
     t.index ["reference"], name: "index_donations_on_reference", unique: true
     t.index ["status"], name: "index_donations_on_status"
@@ -344,6 +348,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.index ["campaign_id"], name: "index_posts_on_campaign_id"
+    t.index ["id", "institution_id"], name: "idx_posts_id_institution", unique: true
     t.index ["institution_id", "post_type"], name: "index_posts_on_institution_id_and_post_type"
     t.index ["institution_id", "published_at"], name: "index_posts_on_institution_id_and_published_at"
     t.index ["institution_id", "status"], name: "index_posts_on_institution_id_and_status"
@@ -401,12 +406,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
 
   add_foreign_key "accountability_report_entries", "accountability_reports", column: ["accountability_report_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_report_same_institution"
   add_foreign_key "accountability_report_entries", "accounts"
+  add_foreign_key "accountability_report_entries", "accounts", column: ["account_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_account_same_institution"
   add_foreign_key "accountability_report_entries", "campaigns"
+  add_foreign_key "accountability_report_entries", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_campaign_same_institution"
   add_foreign_key "accountability_report_entries", "institutions"
   add_foreign_key "accountability_report_entries", "ledger_entries", column: ["ledger_entry_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_ledger_same_institution"
   add_foreign_key "accountability_reports", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_accountability_reports_campaign_same_institution"
   add_foreign_key "accountability_reports", "institutions"
   add_foreign_key "accountability_reports", "users", column: "reviewer_id"
+  add_foreign_key "accounts", "accounts", column: ["institution_id", "parent_code"], primary_key: ["institution_id", "code"], name: "fk_accounts_parent_same_institution"
   add_foreign_key "accounts", "institutions"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
@@ -415,18 +423,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_000005) do
   add_foreign_key "cost_centers", "institutions"
   add_foreign_key "documents", "institutions"
   add_foreign_key "documents", "ledger_entries"
+  add_foreign_key "documents", "ledger_entries", column: ["ledger_entry_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_documents_ledger_entry_same_institution"
   add_foreign_key "documents", "posts"
+  add_foreign_key "documents", "posts", column: ["post_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_documents_post_same_institution"
   add_foreign_key "donation_splits", "donations"
+  add_foreign_key "donation_splits", "donations", column: ["donation_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_donation_splits_donation_same_institution"
   add_foreign_key "donation_splits", "institutions"
   add_foreign_key "donations", "campaigns"
+  add_foreign_key "donations", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_donations_campaign_same_institution"
   add_foreign_key "donations", "institutions"
   add_foreign_key "institutions", "users"
   add_foreign_key "ledger_entries", "accounts"
+  add_foreign_key "ledger_entries", "accounts", column: ["account_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_account_same_institution"
   add_foreign_key "ledger_entries", "campaigns"
   add_foreign_key "ledger_entries", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_campaign_same_institution"
+  add_foreign_key "ledger_entries", "cost_centers", column: ["cost_center_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_cost_center_same_institution"
   add_foreign_key "ledger_entries", "donation_splits"
+  add_foreign_key "ledger_entries", "donation_splits", column: ["donation_split_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_donation_split_same_institution"
   add_foreign_key "ledger_entries", "institutions"
   add_foreign_key "payouts", "donations"
+  add_foreign_key "payouts", "donations", column: ["donation_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_payouts_donation_same_institution"
   add_foreign_key "payouts", "institutions"
   add_foreign_key "posts", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_posts_campaign_same_institution"
   add_foreign_key "posts", "institutions"
