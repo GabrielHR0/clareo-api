@@ -23,6 +23,11 @@ class CampaignRepository
     raise NotImplementedError
   end
 
+  # @return [Array<Campaign>] campanhas visíveis no catálogo público
+  def list_public(institution_ids:, limit: nil, offset: nil)
+    raise NotImplementedError
+  end
+
   def save(campaign)
     raise NotImplementedError
   end

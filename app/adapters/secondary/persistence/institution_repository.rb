@@ -16,6 +16,14 @@ module Persistence
       record && RecordMapper.record_to_institution(record)
     end
 
+    def list_public
+      InstitutionRecord
+        .where(status: "active")
+        .where.not(slug: nil)
+        .order(:id)
+        .map { |record| RecordMapper.record_to_institution(record) }
+    end
+
     def list_by_user(user_id)
       InstitutionRecord.where(user_id: user_id).order(:id).map do |record|
         RecordMapper.record_to_institution(record)

@@ -136,6 +136,9 @@ RSpec.describe "API pública", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(json.dig("institution", "slug")).to eq("instituto-semear")
+      expect(json.dig("institution", "registration_status")).to eq("unregistered")
+      expect(json.dig("institution", "verified")).to be(false)
+      expect(json.dig("institution", "address")).to be_nil
       expect(json.dig("summary", "balance_brl")).to eq("0.00")
       expect(json["campaigns"].map { |item| item["id"] }).to contain_exactly(active.id, closed.id)
     end
@@ -262,6 +265,87 @@ RSpec.describe "API pública", type: :request do
 
       get "/api/v1/public/accountability_reports/#{report.id}"
       expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe "GET /api/v1/public/campaigns" do
+    it "lista campanhas de instituições públicas com resumo financeiro" do
+      active = campaign
+      closed = campaign_repository.save(
+        Campaign.build(
+          institution_id: institution.id,
+          title: "Campanha encerrada",
+          description: "Histórico público",
+          goal: "5000",
+          starts_on: period_start,
+          ends_on: period_end,
+          status: :closed
+        )
+      )
+      paused = campaign_repository.save(
+        Campaign.build(
+          institution_id: institution.id,
+          title: "Campanha pausada",
+          description: "Não deve aparecer",
+          goal: "5000",
+          starts_on: period_start,
+          ends_on: period_end
+        )
+      )
+      paused.pause!
+      campaign_repository.save(paused)
+
+      draft_institution = institution_repository.save(
+        Institution.new(
+          user_id: user.id,
+          legal_name: "Rascunho",
+          settlement_strategy: :pix_payout,
+          pix_key: "rascunho@x.org",
+          status: :draft,
+          slug: "rascunho-publico"
+        )
+      )
+      campaign_repository.save(
+        Campaign.build(
+          institution_id: draft_institution.id,
+          title: "Campanha de rascunho",
+          description: "Não deve aparecer",
+          goal: "1000",
+          starts_on: period_start,
+          ends_on: period_end
+        )
+      )
+
+      posted_entry(kind: :income, amount: "100", account: income_account, campaign_id: active.id)
+
+      get "/api/v1/public/campaigns"
+
+      expect(response).to have_http_status(:ok)
+      ids = json["campaigns"].map { |item| item.dig("campaign", "id") }
+      expect(ids).to contain_exactly(active.id, closed.id)
+
+      item = json["campaigns"].find { |entry| entry.dig("campaign", "id") == active.id }
+      expect(item.dig("institution", "slug")).to eq("instituto-semear")
+      expect(item.dig("summary", "declared_income_brl")).to eq("100.00")
+    end
+
+    it "respeita paginação" do
+      campaign
+      campaign_repository.save(
+        Campaign.build(
+          institution_id: institution.id,
+          title: "Segunda campanha",
+          description: "Também pública",
+          goal: "5000",
+          starts_on: period_start,
+          ends_on: period_end
+        )
+      )
+
+      get "/api/v1/public/campaigns", params: { limit: 1, offset: 1 }
+
+      expect(response).to have_http_status(:ok)
+      expect(json["campaigns"].size).to eq(1)
     end
   end
 end

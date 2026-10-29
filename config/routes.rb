@@ -33,6 +33,7 @@ Rails.application.routes.draw do
       end
 
       namespace :public do
+        get "campaigns", to: "campaigns#index"
         get "institutions/:slug", to: "institutions#show"
         get "institutions/:slug/feed", to: "institutions#feed"
         get "institutions/:slug/campaigns/:id", to: "campaigns#show"

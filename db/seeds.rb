@@ -61,27 +61,26 @@ module Seeds
 
     # Chaveado no email, não em UserRecord.exists?: um run anterior que falhou
     # no meio deixa registro parcial e não deve impedir o seed de terminar.
-    admin = UserRecord.find_by(email: DEV_ADMIN_EMAIL)
+    admin = UserRecord.find_or_initialize_by(email: DEV_ADMIN_EMAIL)
 
-    if admin.nil?
-      admin = UserRecord.create!(
-        email: DEV_ADMIN_EMAIL,
+    if admin.new_record?
+      admin.assign_attributes(
         name: "Admin Clareo",
         role: "platform_admin",
         password: DEV_ADMIN_PASSWORD
       )
+      admin.save!
       puts "criando dados de desenvolvimento"
     else
       puts "dados de desenvolvimento ja existem"
-      return
     end
 
-    institution = InstitutionRecord.create!(
+    institution = InstitutionRecord.find_or_initialize_by(cnpj: "66625514000140")
+    institution.assign_attributes(
       user_record: admin,
       legal_name: "Instituto Semear",
       trade_name: "Semear",
       settlement_strategy: "subaccount",
-      cnpj: "66625514000140",
       legal_entity_kind: "ltda",
       declared_monthly_revenue: 50_000,
       contact_email: "financeiro@institutosemear.org",
@@ -91,44 +90,74 @@ module Seeds
       address_neighborhood: "Jardim Pedra Branca",
       address_postal_code: "14079-452",
       address_city: "Ribeirão Preto",
+      description: "Transparência do começo ao fim para famílias do Vale do Jequitinhonha.",
+      slug: "instituto-semear",
       status: "active",
-      registration_status: "pending"
+      registration_status: "approved"
     )
+    institution.save!
 
     # A estratégia pix_payout não exige CNPJ, que é o caminho de pessoa física.
-    creator = InstitutionRecord.create!(
+    creator = InstitutionRecord.find_or_initialize_by(legal_name: "Criador de Conteúdo")
+    creator.assign_attributes(
       user_record: admin,
-      legal_name: "Criador de Conteúdo",
       settlement_strategy: "pix_payout",
       pix_key: "financeiro@criador.com",
       status: "active"
     )
+    creator.save!
 
     # A assinatura é por instituição: cada tenant paga o seu plano. As duas
     # abaixo pertencem ao mesmo admin, e é exatamente esse o caso que o modelo
     # anterior não permitia.
-    SubscriptionRecord.create!(
-      institution_record: institution,
-      plan_record: PlanRecord.find_by!(code: "pro")
-    )
+    pro_subscription = SubscriptionRecord.find_or_initialize_by(institution_record: institution)
+    pro_subscription.plan_record = PlanRecord.find_by!(code: "pro")
+    pro_subscription.save!
 
-    SubscriptionRecord.create!(
-      institution_record: creator,
-      plan_record: PlanRecord.find_by!(code: "free")
-    )
+    free_subscription = SubscriptionRecord.find_or_initialize_by(institution_record: creator)
+    free_subscription.plan_record = PlanRecord.find_by!(code: "free")
+    free_subscription.save!
 
-    DonationRecord.create!(
+    donation = DonationRecord.find_or_initialize_by(reference: "don_seed_0001")
+    donation.assign_attributes(
       institution_record: institution,
       donor_name: "João Silva",
       donor_email: "joao@example.com",
       amount_brl: 100.00,
       payment_method: "pix",
-      reference: "don_seed_0001",
       status: "pending"
     )
+    donation.save!
+
+    campaign = CampaignRecord.find_or_initialize_by(
+      institution_id: institution.id,
+      title: "Cestas Básicas para 200 Famílias no Vale do Jequitinhonha"
+    )
+    campaign.assign_attributes(
+      description: "Entregas semanais de alimentos e itens de higiene para famílias em situação de vulnerabilidade.",
+      goal_brl: 24_000,
+      starts_on: Date.current - 14.days,
+      ends_on: Date.current + 21.days,
+      status: "active"
+    )
+    campaign.save!
+
+    post = PostRecord.find_or_initialize_by(
+      institution_id: institution.id,
+      campaign_id: campaign.id,
+      title: "Mapeamento das 200 famílias concluído"
+    )
+    post.assign_attributes(
+      content: "O cadastro socioeconômico foi concluído junto às lideranças comunitárias locais.",
+      post_type: "update",
+      status: "published",
+      published_at: Time.current - 2.days
+    )
+    post.save!
 
     puts "admin: #{DEV_ADMIN_EMAIL} / #{DEV_ADMIN_PASSWORD}"
-    puts "instituicao: #{institution.legal_name}"
+    puts "instituicao publica: #{institution.legal_name} (/institutions/#{institution.slug})"
+    puts "campanha: #{campaign.title}"
   end
 end
 

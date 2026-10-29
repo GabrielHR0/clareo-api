@@ -23,6 +23,17 @@ module Persistence
       scope.order(starts_on: :desc, id: :desc).map { |record| RecordMapper.record_to_campaign(record) }
     end
 
+    def list_public(institution_ids:, limit: nil, offset: nil)
+      return [] if institution_ids.empty?
+
+      scope = CampaignRecord
+        .where(institution_id: institution_ids, status: %w[active closed])
+        .order(starts_on: :desc, id: :desc)
+      scope = scope.limit(limit) if limit
+      scope = scope.offset(offset) if offset
+      scope.map { |record| RecordMapper.record_to_campaign(record) }
+    end
+
     def save(campaign)
       record = if campaign.id.nil?
         CampaignRecord.new
