@@ -202,6 +202,39 @@ RSpec.describe "persistência" do
       expect(donation_repository.list_by_institution(institution.id).size).to eq(2)
       expect(donation_repository.list_by_institution(institution.id, status: :received).size).to eq(1)
     end
+
+    it "não sobrescreve doação de outra instituição" do
+      other_institution = institution_repository.save(
+        nova_instituicao(legal_name: "Outra", pix_key: "other@x.org")
+      )
+      other = donation_repository.save(
+        Donation.new(
+          institution: other_institution,
+          donor_name: "Doador",
+          amount: "100.00",
+          payment_method: :pix,
+          reference: "don_other_#{SecureRandom.hex(4)}",
+          splits: [
+            DonationSplit.for_institution(institution: other_institution, percentage: 94),
+            DonationSplit.for_platform(percentage: 6)
+          ]
+        )
+      )
+      forged = Donation.new(
+        institution: institution,
+        id: other.id,
+        donor_name: "Doador",
+        amount: "100.00",
+        payment_method: :pix,
+        reference: "don_forged_#{SecureRandom.hex(4)}",
+        splits: [
+          DonationSplit.for_institution(institution: institution, percentage: 94),
+          DonationSplit.for_platform(percentage: 6)
+        ]
+      )
+
+      expect { donation_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
   end
 
   describe "PayoutRepository" do
@@ -241,6 +274,25 @@ RSpec.describe "persistência" do
 
       # Com payout concluído, não há mais o que receber.
       expect(payout_repository.pending_amount_for(institution.id)).to eq(Money.zero)
+    end
+
+    it "não sobrescreve repasse de outra instituição" do
+      other_institution = institution_repository.save(
+        nova_instituicao(legal_name: "Outra", pix_key: "other-payout@x.org")
+      )
+      other = payout_repository.save(
+        Payout.new(institution: other_institution, amount: "10.00", pix_key: "other-payout@x.org")
+      )
+      forged = Payout.new(
+        institution: institution_repository.save(
+          nova_instituicao(legal_name: "Própria", pix_key: "own-payout@x.org")
+        ),
+        id: other.id,
+        amount: "10.00",
+        pix_key: "own-payout@x.org"
+      )
+
+      expect { payout_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
     end
   end
 
@@ -351,6 +403,15 @@ RSpec.describe "persistência" do
         expect(
           subscription_repository.save(Subscription.new(institution_id: institution.id, plan: pro))
         ).to be_present
+      end
+
+      it "não sobrescreve assinatura de outra instituição" do
+        a = primeira
+        b = segunda
+        other = subscription_repository.save(Subscription.new(institution_id: b.id, plan: pro))
+        forged = Subscription.new(institution_id: a.id, id: other.id, plan: pro)
+
+        expect { subscription_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
       end
     end
 

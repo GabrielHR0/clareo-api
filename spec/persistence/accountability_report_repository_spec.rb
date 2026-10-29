@@ -419,4 +419,137 @@ RSpec.describe "persistência da prestação de contas" do
       expect(account_repository.find_by_id(institution_id: other_institution.id, id: account.id)).to be_nil
     end
   end
+
+  describe "escrita multi-tenant nos repositórios" do
+    it "não sobrescreve campanha de outra instituição" do
+      other_campaign = campaign_repository.save(
+        Campaign.build(
+          institution_id: other_institution.id,
+          title: "Campanha alheia",
+          description: "Outra",
+          goal: "1000",
+          starts_on: period_start,
+          ends_on: period_end
+        )
+      )
+      forged = Campaign.build(
+        institution_id: institution.id,
+        id: other_campaign.id,
+        title: "Campanha tomada",
+        description: "Tentativa",
+        goal: "1000",
+        starts_on: period_start,
+        ends_on: period_end
+      )
+
+      expect { campaign_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "não sobrescreve relatório de outra instituição" do
+      other_report = report_repository.save(
+        AccountabilityReport.build(
+          institution_id: other_institution.id,
+          title: "Relatório alheio",
+          period_start: period_start,
+          period_end: period_end
+        )
+      )
+      forged = AccountabilityReport.build(
+        institution_id: institution.id,
+        id: other_report.id,
+        title: "Relatório tomado",
+        period_start: period_start,
+        period_end: period_end
+      )
+
+      expect { report_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "não sobrescreve lançamento de outra instituição" do
+      other_account = account_repository.save(
+        Account.build(
+          institution_id: other_institution.id,
+          code: "5.1",
+          name: "Material",
+          nature: :expense
+        )
+      )
+      other_entry = ledger_entry_repository.save(
+        LedgerEntry.build(
+          institution_id: other_institution.id,
+          account_id: other_account.id,
+          kind: :expense,
+          amount: "10",
+          status: :posted,
+          posted_on: period_start
+        )
+      )
+      forged = LedgerEntry.build(
+        institution_id: institution.id,
+        id: other_entry.id,
+        account_id: expense_account.id,
+        kind: :expense,
+        amount: "10",
+        status: :posted,
+        posted_on: period_start
+      )
+
+      expect { ledger_entry_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "não sobrescreve post de outra instituição" do
+      other_post = post_repository.save(
+        Post.build(
+          institution_id: other_institution.id,
+          title: "Post alheio",
+          content: "Conteúdo"
+        )
+      )
+      forged = Post.build(
+        institution_id: institution.id,
+        id: other_post.id,
+        title: "Post tomado",
+        content: "Conteúdo"
+      )
+
+      expect { post_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "não sobrescreve documento de outra instituição" do
+      other_account = account_repository.save(
+        Account.build(
+          institution_id: other_institution.id,
+          code: "5.1",
+          name: "Material",
+          nature: :expense
+        )
+      )
+      other_entry = ledger_entry_repository.save(
+        LedgerEntry.build(
+          institution_id: other_institution.id,
+          account_id: other_account.id,
+          kind: :expense,
+          amount: "10",
+          status: :posted,
+          posted_on: period_start
+        )
+      )
+      other_document = document_repository.save(
+        Document.build(
+          institution_id: other_institution.id,
+          target: DocumentTarget.for_ledger_entry(other_entry.id),
+          kind: :recibo
+        )
+      )
+      entry = posted_entry(kind: :expense, amount: "10", account: expense_account)
+      forged = Document.build(
+        institution_id: institution.id,
+        id: other_document.id,
+        target: DocumentTarget.for_ledger_entry(entry.id),
+        kind: :recibo
+      )
+
+      expect { document_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+  end
 end
