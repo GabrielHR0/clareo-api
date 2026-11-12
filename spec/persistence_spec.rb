@@ -8,6 +8,12 @@ RSpec.describe "persistência" do
   let(:plan_repository) { Persistence::PlanRepository.new }
   let(:subscription_repository) { Persistence::SubscriptionRepository.new }
   let(:webhook_repository) { Persistence::WebhookEventRepository.new }
+  let(:account_repository) { Persistence::AccountRepository.new }
+  let(:cost_center_repository) { Persistence::CostCenterRepository.new }
+  let(:document_repository) { Persistence::DocumentRepository.new }
+  let(:ledger_entry_repository) { Persistence::LedgerEntryRepository.new }
+  let(:post_repository) { Persistence::PostRepository.new }
+  let(:campaign_repository) { Persistence::CampaignRepository.new }
 
   let(:user) do
     UserRecord.create!(
@@ -196,6 +202,39 @@ RSpec.describe "persistência" do
       expect(donation_repository.list_by_institution(institution.id).size).to eq(2)
       expect(donation_repository.list_by_institution(institution.id, status: :received).size).to eq(1)
     end
+
+    it "não sobrescreve doação de outra instituição" do
+      other_institution = institution_repository.save(
+        nova_instituicao(legal_name: "Outra", pix_key: "other@x.org")
+      )
+      other = donation_repository.save(
+        Donation.new(
+          institution: other_institution,
+          donor_name: "Doador",
+          amount: "100.00",
+          payment_method: :pix,
+          reference: "don_other_#{SecureRandom.hex(4)}",
+          splits: [
+            DonationSplit.for_institution(institution: other_institution, percentage: 94),
+            DonationSplit.for_platform(percentage: 6)
+          ]
+        )
+      )
+      forged = Donation.new(
+        institution: institution,
+        id: other.id,
+        donor_name: "Doador",
+        amount: "100.00",
+        payment_method: :pix,
+        reference: "don_forged_#{SecureRandom.hex(4)}",
+        splits: [
+          DonationSplit.for_institution(institution: institution, percentage: 94),
+          DonationSplit.for_platform(percentage: 6)
+        ]
+      )
+
+      expect { donation_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
   end
 
   describe "PayoutRepository" do
@@ -235,6 +274,25 @@ RSpec.describe "persistência" do
 
       # Com payout concluído, não há mais o que receber.
       expect(payout_repository.pending_amount_for(institution.id)).to eq(Money.zero)
+    end
+
+    it "não sobrescreve repasse de outra instituição" do
+      other_institution = institution_repository.save(
+        nova_instituicao(legal_name: "Outra", pix_key: "other-payout@x.org")
+      )
+      other = payout_repository.save(
+        Payout.new(institution: other_institution, amount: "10.00", pix_key: "other-payout@x.org")
+      )
+      forged = Payout.new(
+        institution: institution_repository.save(
+          nova_instituicao(legal_name: "Própria", pix_key: "own-payout@x.org")
+        ),
+        id: other.id,
+        amount: "10.00",
+        pix_key: "own-payout@x.org"
+      )
+
+      expect { payout_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
     end
   end
 
@@ -346,5 +404,118 @@ RSpec.describe "persistência" do
           subscription_repository.save(Subscription.new(institution_id: institution.id, plan: pro))
         ).to be_present
       end
+
+      it "não sobrescreve assinatura de outra instituição" do
+        a = primeira
+        b = segunda
+        other = subscription_repository.save(Subscription.new(institution_id: b.id, plan: pro))
+        forged = Subscription.new(institution_id: a.id, id: other.id, plan: pro)
+
+        expect { subscription_repository.save(forged) }.to raise_error(ActiveRecord::RecordNotFound)
+      end
     end
+
+  describe "AccountRepository" do
+    let(:institution) { institution_repository.save(nova_instituicao(legal_name: "Contas", pix_key: "ct@x.org")) }
+
+    it "semeia o catálogo padrão, que pertence ao tenant" do
+      created = account_repository.seed_template!(institution.id)
+
+      expect(created).to eq(AccountTemplate.default.size)
+      expect(account_repository.list_by_institution(institution.id).size).to eq(created)
+    end
+
+    it "não duplica quando o seed roda de novo, e preserva customização" do
+      account_repository.seed_template!(institution.id)
+      custom = Account.build(
+        institution_id: institution.id, code: "99", name: "Rateio interno", nature: :expense
+      )
+      account_repository.save(custom)
+
+      expect(account_repository.seed_template!(institution.id)).to eq(0)
+      expect(account_repository.find(institution_id: institution.id, code: "99").name).to eq("Rateio interno")
+    end
+
+    it "mantém a âncora de receita de doação como conta system de receita" do
+      account_repository.seed_template!(institution.id)
+      anchor = account_repository.find(
+        institution_id: institution.id, code: AccountTemplate::DONATION_INCOME_CODE
+      )
+
+      expect(anchor).to be_income
+      expect(anchor.system).to be(true)
+    end
+
+    it "atualiza em vez de duplicar, porque o código é a identidade da conta" do
+      account_repository.save(
+        Account.build(institution_id: institution.id, code: "5.1", name: "Material", nature: :expense)
+      )
+      saved = account_repository.save(
+        Account.build(institution_id: institution.id, code: "5.1", name: "Material de Consumo", nature: :expense)
+      )
+
+      expect(saved.name).to eq("Material de Consumo")
+      expect(AccountRecord.where(institution_id: institution.id, code: "5.1").count).to eq(1)
+    end
+
+    it "aceita o mesmo código em instituições diferentes, porque o plano é do tenant" do
+      outra = institution_repository.save(nova_instituicao(legal_name: "Outra", pix_key: "oc@x.org"))
+      [ institution, outra ].each do |inst|
+        account_repository.save(
+          Account.build(institution_id: inst.id, code: "5.1", name: "Material", nature: :expense)
+        )
+      end
+
+      expect(account_repository.find(institution_id: institution.id, code: "5.1")).to be_present
+      expect(account_repository.find(institution_id: outra.id, code: "5.1")).to be_present
+    end
+
+    it "filtra por natureza, que é o que o relatório por categoria usa" do
+      account_repository.seed_template!(institution.id)
+
+      incomes = account_repository.list_by_nature(institution.id, :income)
+      expenses = account_repository.list_by_nature(institution.id, :expense)
+
+      expect(incomes).to all(be_income)
+      expect(expenses).to all(be_expense)
+      expect(incomes).not_to be_empty
+      expect(expenses).not_to be_empty
+    end
+
+    it "devolve nil para conta inexistente, em vez de explodir" do
+      expect(account_repository.find(institution_id: institution.id, code: "zzz")).to be_nil
+    end
+  end
+
+  describe "CostCenterRepository" do
+    let(:institution) { institution_repository.save(nova_instituicao(legal_name: "CC", pix_key: "cc@x.org")) }
+
+    def centro(code = "campanha-1")
+      CostCenter.build(institution_id: institution.id, code: code, name: "Campanha 1")
+    end
+
+    it "grava e lê por código, que é a identidade dentro do tenant" do
+      saved = cost_center_repository.save(centro)
+
+      expect(saved.code).to eq("campanha-1")
+      expect(cost_center_repository.find(institution_id: institution.id, code: "campanha-1")).to be_present
+    end
+
+    it "atualiza em vez de duplicar, porque o código é a identidade" do
+      cost_center_repository.save(centro("campanha-1"))
+      saved = cost_center_repository.save(CostCenter.build(
+        institution_id: institution.id, code: "campanha-1", name: "Campanha Renomeada"
+      ))
+
+      expect(saved.name).to eq("Campanha Renomeada")
+      expect(CostCenterRecord.where(institution_id: institution.id, code: "campanha-1").count).to eq(1)
+    end
+
+    it "não devolve centro de custo de outra instituição" do
+      outra = institution_repository.save(nova_instituicao(legal_name: "Outra CC", pix_key: "occ@x.org"))
+      cost_center_repository.save(CostCenter.build(institution_id: outra.id, code: "alheio", name: "Alheio"))
+
+      expect(cost_center_repository.find(institution_id: institution.id, code: "alheio")).to be_nil
+    end
+  end
 end

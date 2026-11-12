@@ -20,7 +20,9 @@ Rails.application.configure do
 
   # Show full error reports.
   config.consider_all_requests_local = true
-  config.cache_store = :null_store
+  # Memória, não null_store: a blacklist de JWT precisa existir no teste para
+  # provar que o logout revoga o token.
+  config.cache_store = :memory_store
 
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable
@@ -39,4 +41,8 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Comprovante em disco local, mesmo em teste: o spec anexa um arquivo de
+  # verdade para provar que a association funciona, não um stub.
+  config.active_storage.service = :local
 end

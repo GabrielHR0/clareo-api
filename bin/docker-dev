@@ -1,40 +1,34 @@
 #!/usr/bin/env bash
-# Roda um comando do projeto dentro do container de desenvolvimento, que tem
-# Ruby 4.0.6 e o bundle completo, incluindo o agoo.
+# Roda um comando no container de desenvolvimento.
 #
-# O bundle vive num volume nomeado, entao as extensoes nativas (pg, agoo,
-# bcrypt) compilam uma vez so. O codigo entra por bind mount: editar arquivo
-# na maquina e o container ve na hora.
+# Delegar para `docker compose run` é de propósito: assim o comando roda na
+# mesma rede dos serviços e enxerga o mesmo banco. Um `docker run` avulso com
+# host.docker.internal alcança o Postgres do WSL na máquina, que é outra base
+# e está numa versão de schema diferente — e a falha aparece como "migration
+# pendente", que é um sintoma enganoso.
 #
-# O Postgres e o Redis do WSL nao estao na rede do container, entao o host do
-# banco vira host.docker.internal.
+# O bundle fica num volume nomeado, então as extensões nativas compilam uma vez.
 #
 # Uso:
-#   bin/docker-dev rspec
-#   bin/docker-dev rubocop
+#   bin/docker-dev rspec                     # ambiente de desenvolvimento
+#   RAILS_ENV=test bin/docker-dev rspec      # contra o banco de teste
 #   bin/docker-dev rails db:migrate
 #   bin/docker-dev sh -c "bundle exec rails server -u agoo"
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="${CLAREO_DEV_IMAGE:-clareo-dev:4.0.6}"
-# Mesmo volume que o compose usa: os gems sao compilados uma vez e serves tanto
-# para bin/docker-dev quanto para docker compose up.
-BUNDLE_VOLUME="${CLAREO_BUNDLE_VOLUME:-clareo_bundle}"
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [ $# -eq 0 ]; then
   echo "uso: bin/docker-dev <comando> [args...]" >&2
   echo "exemplos:" >&2
   echo "  bin/docker-dev rspec" >&2
-  echo "  bin/docker-dev rubocop" >&2
+  echo "  RAILS_ENV=test bin/docker-dev rspec" >&2
   echo "  bin/docker-dev rails db:migrate" >&2
   exit 64
 fi
 
-# O WSL tem um /usr/bin/docker proprio, que fala com o daemon do Linux e nao
-# alcança o Docker Desktop. Docker Desktop nao expoe socket unix, entao ele
-# sempre falha. Aqui escolhe o cliente que realmente fala com o daemon: o
-# docker.exe do Windows quando ele existe.
+# O /usr/bin/docker do WSL sombreia o do Docker Desktop e sempre falha, porque o
+# Desktop não expõe socket unix. Escolhe o cliente que fala com o daemon.
 DOCKER=""
 for candidate in docker.exe docker; do
   if command -v "$candidate" >/dev/null 2>&1 && "$candidate" info >/dev/null 2>&1; then
@@ -44,49 +38,37 @@ for candidate in docker.exe docker; do
 done
 
 if [ -z "$DOCKER" ]; then
-  echo "nao achei um cliente docker que fale com o daemon." >&2
-  echo "o Docker Desktop esta aberto?" >&2
+  echo "não achei um cliente docker que fale com o daemon. O Docker Desktop está aberto?" >&2
   exit 69
 fi
 
-# O docker.exe do Windows nao entende /mnt/c/... nem /c/...; precisa do caminho
-# Windows. Git Bash usa cygpath, WSL usa wslpath, e pode ser que nenhum dos dois
-# esteja disponivel se o script rodar em outro lugar.
-MOUNT_ROOT="$ROOT"
-if [ "$DOCKER" = "docker.exe" ]; then
-  if command -v wslpath >/dev/null 2>&1; then
-    MOUNT_ROOT="$(wslpath -w "$ROOT")"
-  elif command -v cygpath >/dev/null 2>&1; then
-    MOUNT_ROOT="$(cygpath -w "$ROOT")"
-  else
-    echo "wslpath e cygpath indisponiveis: nao sei converter \$ROOT para o" >&2
-    echo "caminho que o docker.exe do Windows entende." >&2
-    exit 64
-  fi
-fi
-
-if ! "$DOCKER" image inspect "$IMAGE" >/dev/null 2>&1; then
-  echo "imagem $IMAGE nao existe; construindo (a primeira vez leva alguns minutos)..." >&2
-  "$DOCKER" build -f "$ROOT/Dockerfile.dev" -t "$IMAGE" "$ROOT"
-fi
-
-# Os binstubs (bin/rspec, bin/rubocop) so existem depois do bundle install, e
-# a imagem nao os cria. Wrappe em bundle exec para que `docker-dev rspec`
-# funcione igual `bin/rspec` na maquina.
+# Os binstubs (bin/rspec, bin/rubocop) só existem depois do bundle install, e a
+# imagem não os cria. Wrappe em bundle exec para que `docker-dev rspec` funcione
+# igual `bin/rspec` na máquina.
 case "$1" in
   bundle|ruby|sh|bash|-* ) ;;
   rspec|rubocop|rails|rake|brakeman|bundler-audit|thrust|kamal)
     set -- bundle exec "$@" ;;
 esac
 
-# O build ja copiou o codigo para dentro da imagem, mas o bind mount tem
-# precedencia e e o que voce esta editando.
-exec "$DOCKER" run --rm \
-  --add-host=host.docker.internal:host-gateway \
-  -v "$MOUNT_ROOT:/rails" \
-  -v "$BUNDLE_VOLUME:/usr/local/bundle" \
-  -w /rails \
-  -e RAILS_ENV="${RAILS_ENV:-development}" \
-  -e DATABASE_HOST=host.docker.internal \
-  -e DATABASE_PORT="${DATABASE_PORT:-5432}" \
-  "$IMAGE" "$@"
+# db:migrate e db:seed são idempotentes, mas não fazem sentido a cada comando.
+# Quem quiser rodá-los pede explicitamente, ou sobe com `docker compose up`.
+#
+# RAILS_ENV precisa decidir antes de montar o docker run, e não pode depender
+# de quem chamou. Variável de ambiente do PowerShell não chega no WSL bash, então
+# `RAILS_ENV=test` digitado no PowerShell chegaria vazio aqui e cairia em
+# development — que é exatamente o bug que este script corrige.
+#
+# Por isso a regra é por comando, não por ambiente: rodar spec é sempre test,
+# sem depender de nada externo. Os outros comandos seguem o ambiente, com
+# development como padrão.
+case "$1" in
+  rspec) RAILS_ENV_VALUE=test ;;
+  *) RAILS_ENV_VALUE="${RAILS_ENV:-development}" ;;
+esac
+
+"$DOCKER" compose run --rm \
+  -e RUN_MIGRATIONS=0 \
+  -e RAILS_ENV="$RAILS_ENV_VALUE" \
+  --entrypoint /rails/docker/entrypoint-dev.sh \
+  web "$@"

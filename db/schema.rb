@@ -10,9 +10,111 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_29_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "accountability_report_entries", force: :cascade do |t|
+    t.string "account_code", null: false
+    t.bigint "account_id", null: false
+    t.string "account_name", null: false
+    t.bigint "accountability_report_id", null: false
+    t.decimal "amount_brl", precision: 15, scale: 2, null: false
+    t.bigint "campaign_id"
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.bigint "institution_id", null: false
+    t.string "kind", null: false
+    t.bigint "ledger_entry_id", null: false
+    t.string "origin", null: false
+    t.date "posted_on", null: false
+    t.datetime "updated_at", null: false
+    t.index ["accountability_report_id", "ledger_entry_id"], name: "idx_report_entries_one_per_ledger_entry", unique: true
+    t.index ["campaign_id"], name: "index_accountability_report_entries_on_campaign_id"
+    t.index ["institution_id", "posted_on"], name: "idx_on_institution_id_posted_on_fcccadc943"
+    t.index ["ledger_entry_id"], name: "index_accountability_report_entries_on_ledger_entry_id"
+    t.check_constraint "amount_brl >= 0::numeric", name: "accountability_report_entries_amount_check"
+    t.check_constraint "kind::text = ANY (ARRAY['income'::character varying, 'expense'::character varying]::text[])", name: "accountability_report_entries_kind_check"
+    t.check_constraint "origin::text = ANY (ARRAY['donation'::character varying, 'declared'::character varying]::text[])", name: "accountability_report_entries_origin_check"
+  end
+
+  create_table "accountability_reports", force: :cascade do |t|
+    t.datetime "approved_at"
+    t.bigint "campaign_id"
+    t.datetime "created_at", null: false
+    t.bigint "institution_id", null: false
+    t.date "period_end", null: false
+    t.date "period_start", null: false
+    t.datetime "published_at"
+    t.text "review_notes"
+    t.text "review_opinion"
+    t.datetime "review_started_at"
+    t.bigint "reviewer_id"
+    t.string "status", default: "draft", null: false
+    t.datetime "submitted_at"
+    t.text "summary"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id", "period_end"], name: "index_accountability_reports_on_campaign_id_and_period_end"
+    t.index ["id", "institution_id"], name: "idx_accountability_reports_id_institution", unique: true
+    t.index ["institution_id", "campaign_id", "period_start", "period_end"], name: "idx_accountability_reports_period"
+    t.index ["institution_id", "status"], name: "index_accountability_reports_on_institution_id_and_status"
+    t.index ["published_at"], name: "index_accountability_reports_on_published_at"
+    t.index ["status", "submitted_at"], name: "index_accountability_reports_on_status_and_submitted_at"
+    t.check_constraint "(status::text <> ALL (ARRAY['approved'::character varying, 'published'::character varying]::text[])) OR approved_at IS NOT NULL", name: "accountability_reports_approved_at_check"
+    t.check_constraint "(status::text <> ALL (ARRAY['approved'::character varying, 'published'::character varying]::text[])) OR review_opinion IS NOT NULL", name: "accountability_reports_opinion_check"
+    t.check_constraint "(status::text <> ALL (ARRAY['submitted'::character varying, 'under_review'::character varying, 'approved'::character varying, 'changes_requested'::character varying, 'published'::character varying]::text[])) OR submitted_at IS NOT NULL", name: "accountability_reports_submitted_at_check"
+    t.check_constraint "period_end >= period_start", name: "accountability_reports_period_check"
+    t.check_constraint "status::text <> 'published'::text OR published_at IS NOT NULL", name: "accountability_reports_published_at_check"
+    t.check_constraint "status::text <> 'under_review'::text OR reviewer_id IS NOT NULL", name: "accountability_reports_reviewer_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'submitted'::character varying, 'under_review'::character varying, 'approved'::character varying, 'changes_requested'::character varying, 'published'::character varying]::text[])", name: "accountability_reports_status_check"
+  end
+
+  create_table "accounts", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.bigint "institution_id", null: false
+    t.string "name", null: false
+    t.string "nature", null: false
+    t.string "parent_code"
+    t.boolean "system", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["id", "institution_id"], name: "idx_accounts_id_institution", unique: true
+    t.index ["institution_id", "code"], name: "index_accounts_on_institution_id_and_code", unique: true
+    t.index ["institution_id", "nature"], name: "index_accounts_on_institution_id_and_nature"
+    t.index ["institution_id", "parent_code"], name: "index_accounts_on_institution_id_and_parent_code"
+    t.check_constraint "nature::text = ANY (ARRAY['income'::character varying, 'expense'::character varying]::text[])", name: "accounts_nature_check"
+    t.check_constraint "parent_code IS NULL OR parent_code::text <> code::text", name: "accounts_not_own_parent_check"
+  end
+
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "record_id", null: false
+    t.string "record_type", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename", null: false
+    t.string "key", null: false
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
 
   create_table "audit_logs", force: :cascade do |t|
     t.string "action", null: false
@@ -27,6 +129,58 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.index ["user_id"], name: "index_audit_logs_on_user_id"
   end
 
+  create_table "campaigns", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.date "ends_on", null: false
+    t.decimal "goal_brl", precision: 15, scale: 2, null: false
+    t.bigint "institution_id", null: false
+    t.date "starts_on", null: false
+    t.string "status", default: "active", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["id", "institution_id"], name: "idx_campaigns_id_institution", unique: true
+    t.index ["institution_id", "ends_on"], name: "index_campaigns_on_institution_id_and_ends_on"
+    t.index ["institution_id", "status"], name: "index_campaigns_on_institution_id_and_status"
+    t.check_constraint "ends_on >= starts_on", name: "campaigns_period_check"
+    t.check_constraint "goal_brl > 0::numeric", name: "campaigns_goal_check"
+    t.check_constraint "status::text = ANY (ARRAY['active'::character varying, 'paused'::character varying, 'closed'::character varying]::text[])", name: "campaigns_status_check"
+  end
+
+  create_table "cost_centers", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.bigint "institution_id", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["id", "institution_id"], name: "idx_cost_centers_id_institution", unique: true
+    t.index ["institution_id", "active"], name: "index_cost_centers_on_institution_id_and_active"
+    t.index ["institution_id", "code"], name: "index_cost_centers_on_institution_id_and_code", unique: true
+  end
+
+  create_table "documents", force: :cascade do |t|
+    t.string "attachable_type", null: false
+    t.datetime "created_at", null: false
+    t.bigint "institution_id", null: false
+    t.date "issued_on"
+    t.string "kind", null: false
+    t.string "kind_detail"
+    t.bigint "ledger_entry_id"
+    t.string "number"
+    t.bigint "post_id"
+    t.boolean "public", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["institution_id", "issued_on"], name: "index_documents_on_institution_id_and_issued_on"
+    t.index ["institution_id", "kind"], name: "index_documents_on_institution_id_and_kind"
+    t.index ["institution_id", "public"], name: "index_documents_on_institution_id_and_public"
+    t.index ["ledger_entry_id"], name: "index_documents_on_ledger_entry_id"
+    t.index ["post_id"], name: "index_documents_on_post_id"
+    t.check_constraint "kind::text = 'outro'::text AND kind_detail IS NOT NULL AND length(btrim(kind_detail::text)) > 0 OR kind::text <> 'outro'::text AND kind_detail IS NULL", name: "documents_kind_detail_check"
+    t.check_constraint "kind::text = ANY (ARRAY['nota_fiscal'::character varying, 'recibo'::character varying, 'contrato'::character varying, 'extrato'::character varying, 'comprovante_pix'::character varying, 'relatorio'::character varying, 'declaracao'::character varying, 'foto'::character varying, 'outro'::character varying]::text[])", name: "documents_kind_check"
+    t.check_constraint "ledger_entry_id IS NOT NULL AND post_id IS NULL OR ledger_entry_id IS NULL AND post_id IS NOT NULL", name: "documents_exactly_one_attachable_check"
+  end
+
   create_table "donation_splits", force: :cascade do |t|
     t.string "asaas_split_id"
     t.string "cancellation_reason"
@@ -39,6 +193,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.decimal "total_value_brl", precision: 15, scale: 2
     t.datetime "updated_at", null: false
     t.index ["donation_id"], name: "index_donation_splits_on_donation_id"
+    t.index ["id", "institution_id"], name: "idx_donation_splits_id_institution", unique: true
     t.index ["institution_id"], name: "index_donation_splits_on_institution_id"
     t.index ["status"], name: "index_donation_splits_on_status"
     t.check_constraint "percentage > 0::numeric AND percentage <= 100::numeric", name: "donation_splits_percentage_check"
@@ -51,6 +206,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.decimal "amount_brl", precision: 15, scale: 2, null: false
     t.string "asaas_customer_id"
     t.string "asaas_payment_id"
+    t.bigint "campaign_id"
     t.datetime "created_at", null: false
     t.string "donor_email"
     t.string "donor_name", null: false
@@ -63,8 +219,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.index ["asaas_payment_id"], name: "index_donations_on_asaas_payment_id"
+    t.index ["campaign_id"], name: "index_donations_on_campaign_id"
     t.index ["created_at"], name: "index_donations_on_created_at"
     t.index ["donor_email"], name: "index_donations_on_donor_email"
+    t.index ["id", "institution_id"], name: "idx_donations_id_institution", unique: true
     t.index ["institution_id"], name: "index_donations_on_institution_id"
     t.index ["reference"], name: "index_donations_on_reference", unique: true
     t.index ["status"], name: "index_donations_on_status"
@@ -87,16 +245,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.string "contact_email"
     t.datetime "created_at", null: false
     t.decimal "declared_monthly_revenue", precision: 15, scale: 2
+    t.text "description"
     t.string "legal_entity_kind"
     t.string "legal_name", null: false
     t.string "mobile_phone"
     t.string "pix_key"
     t.string "registration_status", default: "unregistered", null: false
     t.string "settlement_strategy", null: false
+    t.string "slug"
     t.string "status", default: "draft", null: false
     t.string "trade_name"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index "lower((slug)::text)", name: "idx_institutions_slug", unique: true, where: "(slug IS NOT NULL)"
     t.index ["asaas_wallet_id"], name: "index_institutions_on_asaas_wallet_id"
     t.index ["cnpj"], name: "index_institutions_on_cnpj", unique: true
     t.index ["settlement_strategy"], name: "index_institutions_on_settlement_strategy"
@@ -107,7 +268,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.check_constraint "settlement_strategy::text <> 'subaccount'::text OR cnpj IS NOT NULL", name: "institutions_subaccount_needs_cnpj"
     t.check_constraint "settlement_strategy::text <> 'subaccount'::text OR declared_monthly_revenue IS NOT NULL", name: "institutions_subaccount_needs_revenue"
     t.check_constraint "settlement_strategy::text = ANY (ARRAY['subaccount'::character varying, 'pix_payout'::character varying]::text[])", name: "institutions_strategy_check"
+    t.check_constraint "slug IS NULL OR slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "institutions_slug_format_check"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'pending_approval'::character varying, 'active'::character varying, 'blocked'::character varying]::text[])", name: "institutions_status_check"
+  end
+
+  create_table "ledger_entries", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.decimal "amount_brl", precision: 15, scale: 2, null: false
+    t.bigint "campaign_id"
+    t.bigint "cost_center_id"
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.bigint "donation_split_id"
+    t.bigint "institution_id", null: false
+    t.string "kind", null: false
+    t.string "origin", null: false
+    t.date "posted_on"
+    t.string "status", default: "draft", null: false
+    t.datetime "updated_at", null: false
+    t.string "void_reason"
+    t.index ["account_id"], name: "index_ledger_entries_on_account_id"
+    t.index ["campaign_id"], name: "index_ledger_entries_on_campaign_id"
+    t.index ["cost_center_id"], name: "index_ledger_entries_on_cost_center_id"
+    t.index ["donation_split_id"], name: "idx_ledger_entries_one_per_donation_split", unique: true, where: "((origin)::text = 'donation'::text)"
+    t.index ["id", "institution_id"], name: "idx_ledger_entries_id_institution", unique: true
+    t.index ["institution_id", "kind"], name: "index_ledger_entries_on_institution_id_and_kind"
+    t.index ["institution_id", "posted_on"], name: "index_ledger_entries_on_institution_id_and_posted_on"
+    t.index ["institution_id", "status"], name: "index_ledger_entries_on_institution_id_and_status"
+    t.check_constraint "amount_brl >= 0::numeric", name: "ledger_entries_amount_check"
+    t.check_constraint "kind::text = ANY (ARRAY['income'::character varying, 'expense'::character varying]::text[])", name: "ledger_entries_kind_check"
+    t.check_constraint "origin::text <> 'declared'::text OR donation_split_id IS NULL", name: "ledger_entries_declared_without_split_check"
+    t.check_constraint "origin::text <> 'donation'::text OR kind::text = 'income'::text AND donation_split_id IS NOT NULL AND status::text = 'posted'::text", name: "ledger_entries_donation_shape_check"
+    t.check_constraint "origin::text <> 'donation'::text OR void_reason IS NULL", name: "ledger_entries_donation_not_voided_check"
+    t.check_constraint "origin::text = ANY (ARRAY['donation'::character varying, 'declared'::character varying]::text[])", name: "ledger_entries_origin_check"
+    t.check_constraint "status::text <> 'voided'::text OR void_reason IS NOT NULL AND length(btrim(void_reason::text)) > 0", name: "ledger_entries_void_reason_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'posted'::character varying, 'voided'::character varying]::text[])", name: "ledger_entries_status_check"
   end
 
   create_table "payouts", force: :cascade do |t|
@@ -140,6 +335,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.index ["code"], name: "index_plans_on_code", unique: true
     t.check_constraint "code::text = ANY (ARRAY['free'::character varying, 'pro'::character varying, 'enterprise'::character varying]::text[])", name: "plans_code_check"
     t.check_constraint "price_brl >= 0::numeric", name: "plans_price_check"
+  end
+
+  create_table "posts", force: :cascade do |t|
+    t.bigint "campaign_id"
+    t.text "content", null: false
+    t.datetime "created_at", null: false
+    t.bigint "institution_id", null: false
+    t.string "post_type", default: "update", null: false
+    t.datetime "published_at"
+    t.string "status", default: "published", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["campaign_id"], name: "index_posts_on_campaign_id"
+    t.index ["id", "institution_id"], name: "idx_posts_id_institution", unique: true
+    t.index ["institution_id", "post_type"], name: "index_posts_on_institution_id_and_post_type"
+    t.index ["institution_id", "published_at"], name: "index_posts_on_institution_id_and_published_at"
+    t.index ["institution_id", "status"], name: "index_posts_on_institution_id_and_status"
+    t.check_constraint "post_type::text = ANY (ARRAY['update'::character varying, 'report'::character varying]::text[])", name: "posts_post_type_check"
+    t.check_constraint "status::text = ANY (ARRAY['published'::character varying, 'hidden'::character varying]::text[])", name: "posts_status_check"
   end
 
   create_table "subscriptions", force: :cascade do |t|
@@ -190,13 +404,48 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_01_000003) do
     t.check_constraint "status::text = ANY (ARRAY['received'::character varying, 'processing'::character varying, 'processed'::character varying, 'failed'::character varying]::text[])", name: "webhook_events_status_check"
   end
 
+  add_foreign_key "accountability_report_entries", "accountability_reports", column: ["accountability_report_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_report_same_institution"
+  add_foreign_key "accountability_report_entries", "accounts"
+  add_foreign_key "accountability_report_entries", "accounts", column: ["account_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_account_same_institution"
+  add_foreign_key "accountability_report_entries", "campaigns"
+  add_foreign_key "accountability_report_entries", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_campaign_same_institution"
+  add_foreign_key "accountability_report_entries", "institutions"
+  add_foreign_key "accountability_report_entries", "ledger_entries", column: ["ledger_entry_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_report_entries_ledger_same_institution"
+  add_foreign_key "accountability_reports", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_accountability_reports_campaign_same_institution"
+  add_foreign_key "accountability_reports", "institutions"
+  add_foreign_key "accountability_reports", "users", column: "reviewer_id"
+  add_foreign_key "accounts", "accounts", column: ["institution_id", "parent_code"], primary_key: ["institution_id", "code"], name: "fk_accounts_parent_same_institution"
+  add_foreign_key "accounts", "institutions"
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "audit_logs", "users"
+  add_foreign_key "campaigns", "institutions"
+  add_foreign_key "cost_centers", "institutions"
+  add_foreign_key "documents", "institutions"
+  add_foreign_key "documents", "ledger_entries"
+  add_foreign_key "documents", "ledger_entries", column: ["ledger_entry_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_documents_ledger_entry_same_institution"
+  add_foreign_key "documents", "posts"
+  add_foreign_key "documents", "posts", column: ["post_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_documents_post_same_institution"
   add_foreign_key "donation_splits", "donations"
+  add_foreign_key "donation_splits", "donations", column: ["donation_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_donation_splits_donation_same_institution"
   add_foreign_key "donation_splits", "institutions"
+  add_foreign_key "donations", "campaigns"
+  add_foreign_key "donations", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_donations_campaign_same_institution"
   add_foreign_key "donations", "institutions"
   add_foreign_key "institutions", "users"
+  add_foreign_key "ledger_entries", "accounts"
+  add_foreign_key "ledger_entries", "accounts", column: ["account_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_account_same_institution"
+  add_foreign_key "ledger_entries", "campaigns"
+  add_foreign_key "ledger_entries", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_campaign_same_institution"
+  add_foreign_key "ledger_entries", "cost_centers", column: ["cost_center_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_cost_center_same_institution"
+  add_foreign_key "ledger_entries", "donation_splits"
+  add_foreign_key "ledger_entries", "donation_splits", column: ["donation_split_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_ledger_entries_donation_split_same_institution"
+  add_foreign_key "ledger_entries", "institutions"
   add_foreign_key "payouts", "donations"
+  add_foreign_key "payouts", "donations", column: ["donation_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_payouts_donation_same_institution"
   add_foreign_key "payouts", "institutions"
+  add_foreign_key "posts", "campaigns", column: ["campaign_id", "institution_id"], primary_key: ["id", "institution_id"], name: "fk_posts_campaign_same_institution"
+  add_foreign_key "posts", "institutions"
   add_foreign_key "subscriptions", "institutions"
   add_foreign_key "subscriptions", "plans"
 end

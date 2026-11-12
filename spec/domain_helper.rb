@@ -1,4 +1,5 @@
 require "bigdecimal"
+require "date"
 
 # Loads app/domain without booting Rails, without a database and without
 # Bundler. That is the point of keeping the domain framework free: the suite
@@ -15,16 +16,26 @@ DOMAIN_FILES = %w[
   errors/invalid_donation
   errors/invalid_split
   errors/invalid_subscription
+  errors/invalid_account
+  errors/invalid_cost_center
+  errors/invalid_ledger_entry
+  errors/invalid_document
+  errors/invalid_post
+  errors/invalid_campaign
+  errors/invalid_accountability_report
   value_objects/money
   value_objects/percentage
   value_objects/cpf_cnpj
   value_objects/pix_key
   value_objects/external_reference
   value_objects/address
+  value_objects/document_target
   value_objects/charge_snapshot
   value_objects/subaccount_snapshot
   value_objects/transfer_snapshot
   value_objects/subscription_snapshot
+  value_objects/financial_summary
+  value_objects/accountability_report_entry
   entities/donation_split
   entities/institution
   entities/donation
@@ -32,8 +43,16 @@ DOMAIN_FILES = %w[
   entities/subscription
   entities/payout
   entities/webhook_event
+  entities/account
+  entities/cost_center
+  entities/document
+  entities/ledger_entry
+  entities/post
+  entities/campaign
+  entities/accountability_report
   services/split_policy
   services/settlement_plan
+  services/account_template
 ].freeze
 
 DOMAIN_FILES.each { |path| require File.join(DOMAIN_ROOT, path) }

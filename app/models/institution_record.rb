@@ -24,6 +24,56 @@ class InstitutionRecord < ApplicationRecord
     inverse_of: :institution_record,
     dependent: :restrict_with_error
 
+  has_many :account_records,
+    class_name: "AccountRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :cost_center_records,
+    class_name: "CostCenterRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+
+  has_many :ledger_entry_records,
+    class_name: "LedgerEntryRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :document_records,
+    class_name: "DocumentRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :post_records,
+    class_name: "PostRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :campaign_records,
+    class_name: "CampaignRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :accountability_report_records,
+    class_name: "AccountabilityReportRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+  has_many :accountability_report_entry_records,
+    class_name: "AccountabilityReportEntryRecord",
+    foreign_key: :institution_id,
+    inverse_of: :institution_record,
+    dependent: :restrict_with_error
+
+
   SETTLEMENT_STRATEGIES = %w[subaccount pix_payout].freeze
   STATUSES = %w[draft pending_approval active blocked].freeze
   REGISTRATION_STATUSES = %w[unregistered pending approved rejected].freeze
@@ -35,6 +85,10 @@ class InstitutionRecord < ApplicationRecord
   validates :registration_status, inclusion: { in: REGISTRATION_STATUSES }
   validates :legal_entity_kind, inclusion: { in: LEGAL_ENTITY_KINDS }, allow_nil: true
   validates :cnpj, uniqueness: true, allow_nil: true
+  validates :slug,
+    uniqueness: true,
+    format: { with: /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/ },
+    allow_nil: true
 
   validates :declared_monthly_revenue,
     numericality: { greater_than_or_equal_to: 0 },
@@ -50,6 +104,10 @@ class InstitutionRecord < ApplicationRecord
 
   def active?
     status == "active"
+  end
+
+  def public_profile_ready?
+    active? && slug.present?
   end
 
   def provider_bound?

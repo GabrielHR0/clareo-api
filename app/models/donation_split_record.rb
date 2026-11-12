@@ -12,6 +12,13 @@ class DonationSplitRecord < ApplicationRecord
   validates :percentage, numericality: { greater_than: 0, less_than_or_equal_to: 100 }
 
   validate :institution_only_on_institution_recipient
+  validate :donation_belongs_to_institution
+
+  has_many :ledger_entry_records,
+    class_name: "LedgerEntryRecord",
+    foreign_key: :donation_split_id,
+    inverse_of: :donation_split_record,
+    dependent: :restrict_with_error
 
   scope :routable, -> { where(recipient: "institution") }
 
@@ -24,6 +31,14 @@ class DonationSplitRecord < ApplicationRecord
 
     if recipient == "platform" && institution_id.present?
       errors.add(:institution_id, "não pode existir para recipient platform")
+    end
+  end
+
+  def donation_belongs_to_institution
+    return if institution_id.nil? || donation_record.nil?
+
+    if donation_record.institution_id != institution_id
+      errors.add(:donation_id, "must belong to the same institution")
     end
   end
 end

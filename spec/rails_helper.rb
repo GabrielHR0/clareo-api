@@ -1,6 +1,9 @@
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 require 'spec_helper'
-ENV['RAILS_ENV'] ||= 'test'
+# Atribuição, não ||= de propósito. Um spec jamais deve escrever no banco de
+# desenvolvimento, mesmo que RAILS_ENV chegue como development do ambiente: o
+# ||= respeitaria esse valor e a suíte passaria a alterar dados de trabalho.
+ENV['RAILS_ENV'] = 'test'
 require_relative '../config/environment'
 # Prevent database truncation if the environment is production
 abort("The Rails environment is running in production mode!") if Rails.env.production?

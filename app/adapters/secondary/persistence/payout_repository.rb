@@ -39,7 +39,11 @@ module Persistence
     end
 
     def save(payout)
-      record = PayoutRecord.find_by(id: payout.id) || PayoutRecord.new
+      record = if payout.id.nil?
+        PayoutRecord.new
+      else
+        PayoutRecord.find_by!(id: payout.id, institution_id: payout.institution.id)
+      end
       institution_record = InstitutionRecord.find_by!(id: payout.institution.id)
       RecordMapper.payout_to_record(payout, record)
       record.institution_id = institution_record.id

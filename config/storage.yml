@@ -1,0 +1,17 @@
+# O comprovante de um gasto é o lastro da prestação de contas: sem o arquivo,
+# o lançamento é só uma declaração. Por isso o storage é parte do produto, não
+# um detalhe.
+#
+# Em desenvolvimento os arquivos ficam em disco, dentro do container. Em
+# produção, AMAZONE_S3_* precisa estar definido; sem isso o padrão local assume
+# e o upload em massa vira um problema silencioso.
+local:
+  service: Disk
+  root: <%= Rails.root.join("storage") %>
+
+amazon:
+  service: S3
+  access_key_id: <%= ENV["AMAZONE_S3_ACCESS_KEY_ID"] %>
+  secret_access_key: <%= ENV["AMAZONE_S3_SECRET_ACCESS_KEY"] %>
+  region: <%= ENV["AMAZONE_S3_REGION"] %>
+  bucket: <%= ENV["AMAZONE_S3_BUCKET"] %>

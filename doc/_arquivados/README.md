@@ -1,8 +1,8 @@
 # ARQUIVADO — não reflete mais o produto
 
-> **Este documento descreve uma arquitetura que foi descartada.**
+> **Os documentos deste diretório descrevem arquiteturas e modelos descartados.**
 >
-> O Clareo passou por uma mudança de modelo de negócio: as doações deixaram de
+> O Clareo passou por mudanças de modelo de negócio. As doações deixaram de
 > ser convertidas para USDT e renderizadas em protocolo DeFi, e passaram a ser
 > recebidas em BRL e rateadas diretamente pelo Asaas, uma instituição de
 > pagamento autorizada pelo Banco Central.
@@ -13,7 +13,18 @@
 > TronWeb, JustLend e NOWPayments.
 >
 > O histórico importa para entender por que o modelo mudou. Nenhum destes
-> documentos deve ser implementado.
+> documentos deve ser implementado. As pastas de provedores e planejamentos
+> alternativos foram arquivadas pelo mesmo critério.
+
+## Pastas arquivadas
+
+| Pasta | Conteúdo | Motivo do arquivamento |
+|-------|----------|------------------------|
+| `asaas/` | Planejamento do provedor e 30 diagramas do modelo anterior | O contrato vigente está em [`16-INTEGRACAO-ASAAS.md`](../16-INTEGRACAO-ASAAS.md); os diagramas descrevem um produto com 9 tabelas, sem campanhas, feed ou prestação de contas |
+| `inter/` | Referência da API do Inter | Provedor não adotado |
+| `mercado-pago/` | Referência da API do Mercado Pago | Provedor não adotado |
+| `planejamento-lexxen/` | Planejamento com Lexxen | Modelo com cripto descartado em favor do Asaas |
+| `legado-asaas/` | Ponteiro para o planejamento anterior | Substituído pelos diagramas atuais em [`doc/diagramas/`](../diagramas/README.md) |
 
 ## Documentos arquivados
 

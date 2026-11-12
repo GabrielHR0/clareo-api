@@ -1,0 +1,2 @@
+class InvalidLedgerEntry < DomainError
+end

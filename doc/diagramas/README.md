@@ -19,7 +19,10 @@ atualizado é pior.
 | [`estados/`](estados/) | Ciclo de vida de um agregado | ao adicionar uma transição de estado |
 | [`dados/`](dados/) | Modelo de dados relacional | ao mudar migration |
 | [`implantacao/`](implantacao/) | Containers e topologia em produção | ao mudar deploy, infra ou porta |
-| [`legado-asaas/`](legado-asaas/) | Ponteiro para o planejamento anterior | não se aplica |
+
+Os diagramas do planejamento anterior estão em
+[`doc/_arquivados/asaas/diagramas/`](../_arquivados/asaas/diagramas/), com o
+contexto em [`doc/_arquivados/README.md`](../_arquivados/README.md).
 
 ## Estado atual
 
@@ -27,14 +30,14 @@ Nenhuma pasta tem diagramas ainda. Quando cada uma pode ser preenchida:
 
 | Pasta | Depende de | Situação |
 |-------|------------|----------|
-| `classes/` | Fase 1 — Domínio | 24 arquivos em `app/domain`; pode ser feito agora |
-| `dados/` | Fase 2 — Persistência | schema aplicado; pode ser feito agora |
-| `estados/` | Fase 1 — Domínio | transições codificadas e testadas; pode ser feito agora |
-| `implantacao/` | Fase 7 — Operação | topologia local definida, produção não |
-| `contexto/` | Fase 5 — Adapter do Asaas | o provedor já está decidido |
-| `pacotes/` | Fase 3 — Casos de uso | `app/application` e `app/adapters/primary` estão vazios |
-| `casos-de-uso/` | Fase 3 — Casos de uso | depende dos casos de uso escritos |
-| `sequencia/` | Fase 3 e Fase 4 | depende dos casos de uso |
+| `classes/` | Domínio implementado | entidades e value objects em `app/domain`; pode ser feito agora |
+| `dados/` | Persistência implementada | schema aplicado e migrations versionadas; pode ser feito agora |
+| `estados/` | Domínio implementado | transições codificadas e testadas; pode ser feito agora |
+| `implantacao/` | Operação | topologia local definida, produção não |
+| `contexto/` | Integração Asaas | o provedor está decidido; o adapter ainda não existe |
+| `pacotes/` | Casos de uso e API | `app/application` e `app/adapters/primary` já têm código |
+| `casos-de-uso/` | Casos de uso e API | prestação de contas, rotas públicas e autenticação implementados |
+| `sequencia/` | Casos de uso e API | há fluxos implementados para mapear |
 
 "Depende de" indica o que ainda não existe e tornaria o diagrama fictionário.
 Onde a coluna diz "pode ser feito agora", o diagrama descreveria código já

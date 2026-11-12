@@ -5,7 +5,7 @@ require "rails"
 require "active_model/railtie"
 require "active_job/railtie"
 require "active_record/railtie"
-# require "active_storage/engine"
+require "active_storage/engine"
 require "action_controller/railtie"
 # require "action_mailer/railtie"
 # require "action_mailbox/engine"
@@ -34,7 +34,8 @@ module Clareo
     # ubiquitous names flat: Donation, Money, PaymentGateway.
     layer_roots = Dir[config.root.join("app/domain/*")] +
       Dir[config.root.join("app/ports/output")] +
-      Dir[config.root.join("app/adapters/secondary")]
+      Dir[config.root.join("app/adapters/secondary")] +
+      [ config.root.join("app/adapters/primary").to_s ]
 
     config.autoload_paths += layer_roots
     config.eager_load_paths += layer_roots
