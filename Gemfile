@@ -3,7 +3,7 @@ source "https://rubygems.org"
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.3"
 # Use postgresql as the database for Active Record
-gem "pg", "~> 1.1"
+gem "pg", "~> 1.7"
 # Agoo is a Rack-compatible HTTP server written in C. It is Linux and macOS
 # only, so this app cannot be bundled on Windows: run it in WSL.
 gem "agoo"
